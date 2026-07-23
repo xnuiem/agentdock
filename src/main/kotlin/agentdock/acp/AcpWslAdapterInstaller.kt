@@ -27,6 +27,14 @@ internal fun isWslAdapterDownloaded(adapterInfo: AcpAdapterConfig.AdapterInfo): 
     return runCatching { Files.isRegularFile(launchFile) }.getOrDefault(false)
 }
 
+/** Display-only path shown in the UI for a WSL-installed adapter - the native WSL path, not the unused Windows-side dir. */
+internal fun wslDownloadPathDisplay(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
+    val eel = AcpEelEnvironment.resolveWslEelApiBlocking() ?: return ""
+    return runCatching {
+        AcpEelEnvironment.targetPathString(AcpEelEnvironment.adapterDependenciesDir(eel, adapterInfo.id))
+    }.getOrDefault("")
+}
+
 internal fun wslInstalledVersion(adapterInfo: AcpAdapterConfig.AdapterInfo): String? {
     if (adapterInfo.distribution.type != AcpAdapterConfig.DistributionType.NPM) return null
     val eel = AcpEelEnvironment.resolveWslEelApiBlocking() ?: return null

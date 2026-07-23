@@ -456,12 +456,15 @@ private suspend fun AcpClientService.launchAdapterProcessOverWsl(
         launchFileTarget to adapterInfo.args
     }
 
+    // baseEnvironment() is Windows-shaped (System.getenv() + host shell env) - handing that to
+    // a WSL process stomps its real PATH and breaks even the shebang interpreter lookup (node,
+    // env). Leave env empty so the WSL environment's own login/shell environment applies.
     val proc = AcpEelEnvironment.spawn(
         eel = eel,
         executable = executable,
         args = args,
         workingDirectory = runtimeDir,
-        environment = AcpProcessEnvironment.baseEnvironment()
+        environment = emptyMap()
     )
     return proc to AcpEelEnvironment.targetPathString(adapterRoot)
 }

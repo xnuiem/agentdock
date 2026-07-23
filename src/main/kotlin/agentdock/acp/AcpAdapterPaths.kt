@@ -53,6 +53,7 @@ object AcpAdapterPaths {
         target: AcpExecutionTarget = currentTarget()
     ): String {
         val adapterInfo = getAdapterInfo(adapterName)
+        if (target == AcpExecutionTarget.WSL) return wslDownloadPathDisplay(adapterInfo)
         return resolveDownloadPath(adapterInfo, target)
     }
 
