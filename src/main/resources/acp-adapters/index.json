@@ -1,11 +1,7 @@
 {
   "files": [
     "acp-adapters/claude-code.json",
-    "acp-adapters/cursor-cli.json",
-    "acp-adapters/codex.json",
-    "acp-adapters/github-copilot-cli.json",
     "acp-adapters/kilo.json",
-    "acp-adapters/qoder.json",
     "acp-adapters/opencode.json"
   ]
 }

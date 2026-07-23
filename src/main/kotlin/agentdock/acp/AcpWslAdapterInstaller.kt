@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
  * EelApi, so the launch path in AcpAdapterInitializer finds a real Linux install rather
  * than a Windows-side download that a WSL guest can't run.
  *
- * Archive-distributed adapters (cursor-cli) aren't wired up for WSL yet - see
+ * Archive-distributed adapters aren't wired up for WSL yet - see
  * downloadArchiveDistributionLocal for the LOCAL equivalent that would need mirroring.
  */
 private val wslAdapterMetadataJson = Json { ignoreUnknownKeys = true }
