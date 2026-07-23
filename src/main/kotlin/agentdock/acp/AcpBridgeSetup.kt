@@ -312,6 +312,7 @@ internal fun AcpBridge.installAdapterQueries() {
 
                         replacingRuntime = true
                         val success = AcpAdapterPaths.installAdapterRuntime(
+                            project = service.project,
                             targetDir = targetDir,
                             adapterInfo = adapterInfo,
                             statusCallback = statusCallback,
@@ -444,6 +445,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         }
 
                         val success = AcpAdapterPaths.installAdapterRuntime(
+                            project = service.project,
                             targetDir = targetDir,
                             adapterInfo = adapterInfo,
                             statusCallback = statusCallback,

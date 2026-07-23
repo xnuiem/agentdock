@@ -394,7 +394,7 @@ internal suspend fun AcpClientService.initializeSharedProcessAtStartup(
 }
 
 /** Relative launch path for an adapter inside the WSL environment's own runtime dir. */
-private fun wslRelativeLaunchPath(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
+internal fun wslRelativeLaunchPath(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
     return when (adapterInfo.distribution.type) {
         AcpAdapterConfig.DistributionType.ARCHIVE ->
             platformBinaryForTarget(adapterInfo.distribution.binaryName, AcpExecutionTarget.WSL)
@@ -427,7 +427,7 @@ private suspend fun AcpClientService.launchAdapterProcessOverWsl(
 ): Pair<Process, String> {
     val eel = AcpEelEnvironment.resolveWslEelApi(project)
     val runtimeDir = AcpEelEnvironment.runtimeDir(eel)
-    val adapterRoot = runtimeDir.resolve("dependencies").resolve(adapterInfo.id)
+    val adapterRoot = AcpEelEnvironment.adapterDependenciesDir(eel, adapterInfo.id)
     val launchFile = adapterRoot.resolve(wslRelativeLaunchPath(adapterInfo))
 
     if (!Files.isRegularFile(launchFile)) {

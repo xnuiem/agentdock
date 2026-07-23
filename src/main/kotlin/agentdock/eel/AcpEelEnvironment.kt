@@ -2,11 +2,14 @@ package agentdock.eel
 
 import agentdock.acp.AcpExecutionMode
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.platform.eel.EelApi
+import com.intellij.platform.eel.EelDescriptor
 import com.intellij.platform.eel.EelOsFamily
 import com.intellij.platform.eel.EelProcess
 import com.intellij.platform.eel.provider.getEelDescriptor
 import com.intellij.platform.eel.provider.toEelApi
+import com.intellij.platform.eel.provider.toEelApiBlocking
 import com.intellij.platform.eel.provider.utils.EelPathUtils
 import com.intellij.platform.eel.provider.utils.JEelUtils
 import com.intellij.platform.eel.spawnProcess
@@ -33,7 +36,23 @@ internal object AcpEelEnvironment {
      * a distro is configured but doesn't match the project's own environment.
      */
     suspend fun resolveWslEelApi(project: Project): EelApi {
-        val descriptor = project.getEelDescriptor()
+        val descriptor = validatedWslDescriptor(project.getEelDescriptor())
+        return descriptor.toEelApi()
+    }
+
+    /**
+     * Best-effort, non-suspend resolution for synchronous call sites (adapter list badges,
+     * "is this installed" checks) that can't await a coroutine. Returns null instead of
+     * throwing when WSL isn't usable right now - those call sites should just report
+     * "not downloaded" rather than crash the UI.
+     */
+    fun resolveWslEelApiBlocking(): EelApi? {
+        val project = ProjectManager.getInstance().openProjects.firstOrNull { !it.isDisposed } ?: return null
+        val descriptor = runCatching { validatedWslDescriptor(project.getEelDescriptor()) }.getOrNull() ?: return null
+        return runCatching { descriptor.toEelApiBlocking() }.getOrNull()
+    }
+
+    private fun validatedWslDescriptor(descriptor: EelDescriptor): EelDescriptor {
         if (descriptor.osFamily != EelOsFamily.Posix) {
             throw UnsupportedWslProjectException(
                 "WSL execution is enabled in Agent Dock settings, but this project is not open " +
@@ -47,11 +66,15 @@ internal object AcpEelEnvironment {
                     "is open from '${descriptor.name}'. Update the WSL distribution in settings or reopen the project."
             )
         }
-        return descriptor.toEelApi()
+        return descriptor
     }
 
     /** Native runtime directory for downloaded adapters inside the resolved WSL environment. */
     fun runtimeDir(eel: EelApi): Path = EelPathUtils.getHomePath(eel.descriptor).resolve(".agent-dock")
+
+    /** Native directory a specific adapter is (or would be) installed into inside the WSL environment. */
+    fun adapterDependenciesDir(eel: EelApi, adapterId: String): Path =
+        runtimeDir(eel).resolve("dependencies").resolve(adapterId)
 
     /** Converts a host-side path to the string form the target environment's process sees. */
     fun targetPathString(path: Path): String = JEelUtils.toEelPath(path).toString()
