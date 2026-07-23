@@ -38,6 +38,7 @@ import java.util.Collections
 import agentdock.BuildConfig
 import agentdock.eel.AcpEelEnvironment
 import agentdock.history.AgentDockHistoryService
+import com.intellij.platform.eel.provider.utils.EelPathUtils
 
 // Keep this aligned with the broader ACP startup budget.
 // A freshly updated adapter can need materially longer than 60s
@@ -603,10 +604,15 @@ internal fun AcpClientService.applyAdapterRuntimePreferences(
 }
 
 internal fun AcpClientService.resolveAdapterProcessWorkingDirectory(adapterRoot: File): File {
+    // On IntelliJ Platform 2025.2+, File/Path operations are transparently routed through a
+    // project's Eel environment (e.g. WSL), so a WSL-opened project's basePath can pass
+    // exists()/isDirectory() here even though it isn't a real host path. LOCAL execution must
+    // stay strictly local - GeneralCommandLine below builds a Windows-native command, so handing
+    // it a WSL-routed working directory launches a Windows binary through a POSIX shell and fails.
     val projectBase = project.basePath
         ?.takeIf { it.isNotBlank() }
         ?.let { File(it) }
-        ?.takeIf { it.exists() && it.isDirectory }
+        ?.takeIf { it.exists() && it.isDirectory && EelPathUtils.isPathLocal(it.toPath()) }
     return projectBase ?: adapterRoot
 }
 
