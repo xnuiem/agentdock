@@ -18,7 +18,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2025.1")
+        intellijIdea("2026.1")
         jetbrainsRuntime()
         bundledPlugin("org.jetbrains.plugins.terminal")
     }

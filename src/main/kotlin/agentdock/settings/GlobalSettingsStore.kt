@@ -48,7 +48,9 @@ object GlobalSettingsStore {
                 adapterId = settings.gitCommitGeneration.adapterId.trim(),
                 modelId = settings.gitCommitGeneration.modelId.trim(),
                 instructions = settings.gitCommitGeneration.instructions.trim()
-            )
+            ),
+            executionTarget = normalizeExecutionTarget(settings.executionTarget),
+            wslDistro = settings.wslDistro.trim()
         )
         val file = settingsFile()
         file.parentFile?.mkdirs()
@@ -118,6 +120,13 @@ object GlobalSettingsStore {
         return when (style?.trim()?.lowercase()) {
             "default", "blue", "background-secondary", "primary", "secondary", "accent", "input", "editor-bg" -> style.trim().lowercase()
             else -> "default"
+        }
+    }
+
+    private fun normalizeExecutionTarget(target: String?): String {
+        return when (target?.trim()?.lowercase()) {
+            "wsl" -> "wsl"
+            else -> "local"
         }
     }
 }

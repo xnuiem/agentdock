@@ -59,7 +59,9 @@ data class GlobalSettings(
     val userMessageBackgroundStyle: String = "default",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
-    val quotaWidgetEnabled: Boolean = false
+    val quotaWidgetEnabled: Boolean = false,
+    val executionTarget: String = "local",
+    val wslDistro: String = ""
 )
 
 @Serializable

@@ -1,5 +1,6 @@
 package agentdock.acp
 
+import agentdock.settings.GlobalSettingsStore
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -7,7 +8,8 @@ internal fun quoteUnixShellArg(value: String): String =
     "'" + value.replace("'", "'\"'\"'") + "'"
 
 internal enum class AcpExecutionTarget {
-    LOCAL
+    LOCAL,
+    WSL
 }
 
 internal data class CommandResult(
@@ -21,7 +23,18 @@ internal object AcpExecutionMode {
 
     fun isWindowsHost(): Boolean = System.getProperty("os.name").lowercase().contains("win")
 
-    fun currentTarget(): AcpExecutionTarget = AcpExecutionTarget.LOCAL
+    /**
+     * Execution target is an explicit user opt-in (Settings > Agent Execution), not
+     * auto-detected from project location, so switching to WSL never silently changes
+     * behavior for an existing local project.
+     */
+    fun currentTarget(): AcpExecutionTarget = when (GlobalSettingsStore.load().executionTarget) {
+        "wsl" -> AcpExecutionTarget.WSL
+        else -> AcpExecutionTarget.LOCAL
+    }
+
+    /** Configured WSL distribution name, only meaningful when [currentTarget] is [AcpExecutionTarget.WSL]. */
+    fun wslDistro(): String? = GlobalSettingsStore.load().wslDistro.trim().takeIf { it.isNotEmpty() }
 
     fun localBaseRuntimeDir(): File = File(System.getProperty("user.home"), RUNTIME_DIR_NAME)
 

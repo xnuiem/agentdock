@@ -462,6 +462,8 @@ export interface GlobalSettings {
   audioTranscription: AudioTranscriptionSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
   quotaWidgetEnabled: boolean;
+  executionTarget: 'local' | 'wsl';
+  wslDistro: string;
 }
 
 export interface GlobalSettingsPayload {
