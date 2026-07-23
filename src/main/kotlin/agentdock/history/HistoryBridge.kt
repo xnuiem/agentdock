@@ -32,7 +32,7 @@ class HistoryBridge(
 
     @Serializable
     private data class RenameHistoryPayload(
-        val projectPath: String,
+        val projectPath: String? = null,
         val conversationId: String,
         val newTitle: String
     )
@@ -129,9 +129,10 @@ class HistoryBridge(
                 scope.launch(Dispatchers.Default) {
                     try {
                         val request = permissiveJson.decodeFromString<RenameHistoryPayload>(payload)
-                        val success = AgentDockHistoryService.renameConversation(request.projectPath, request.conversationId, request.newTitle)
+                        val projectPath = request.projectPath?.trim()?.takeUnless { it.isEmpty() } ?: defaultProjectPath
+                        val success = AgentDockHistoryService.renameConversation(projectPath, request.conversationId, request.newTitle)
                         if (success) {
-                            val history = AgentDockHistoryService.getHistoryList(request.projectPath)
+                            val history = AgentDockHistoryService.getHistoryList(projectPath)
                             pushHistoryList(permissiveJson.encodeToString(history))
                         } else {
                             sendJsError("Failed to rename conversation")

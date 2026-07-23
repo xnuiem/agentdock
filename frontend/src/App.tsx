@@ -64,6 +64,7 @@ function App() {
     handleOpenHistory,
     openSingletonTab,
     handleUserMessageSent,
+    handleTabRenamed,
     handleAssistantActivity,
     handleAtBottomChange,
     handleCanMarkReadChange,
@@ -87,6 +88,14 @@ function App() {
         onSelectTab={handleSelectTab}
         onReorderTabs={handleReorderTabs}
         onCloseTab={handleCloseTab}
+        onRenameTab={(tabId, newTitle) => {
+          const tab = tabs.find((t) => t.id === tabId);
+          handleTabRenamed(tabId, newTitle);
+          if (tab) {
+            const conversationId = tab.historySession?.conversationId ?? tab.conversationId;
+            ACPBridge.renameHistoryConversation(tab.historySession?.projectPath, conversationId, newTitle);
+          }
+        }}
         onCloseAllTabs={handleCloseAllTabs}
         onNewTab={() => handleNewTab()}
         onNewTabWithAgent={(agentId) => handleNewTab(agentId)}
@@ -115,6 +124,7 @@ function App() {
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onOpenHistory={handleOpenHistory}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
+              onRenamed={(title) => handleTabRenamed(tab.id, title)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}
               onAtBottomChange={(isAtBottom) => handleAtBottomChange(tab.id, isAtBottom)}
               onCanMarkReadChange={(canMarkRead) => handleCanMarkReadChange(tab.id, canMarkRead)}
