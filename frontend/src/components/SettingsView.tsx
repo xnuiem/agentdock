@@ -353,14 +353,14 @@ export function SettingsView() {
 
             {globalSettings.settings.executionTarget === 'wsl' && (
               <SettingsCardShell
-                title='WSL Distribution'
-                description='Name of the WSL distribution agent CLIs should launch inside (e.g. Ubuntu)'
+                title='WSL Distribution (optional)'
+                description='Leave blank to use whichever WSL distribution the current project is already open from. Only set this to double check you are on the distro you expect - it does not need the "WSL:" prefix shown in the project path.'
               >
                 <input
                   type='text'
                   value={globalSettings.settings.wslDistro}
                   onChange={(e) => handleWslDistroChange(e.target.value)}
-                  placeholder='Ubuntu'
+                  placeholder='e.g. Ubuntu-24.04 (optional)'
                   className='w-[240px] max-w-[42vw] rounded-[4px] border border-border bg-background-secondary px-2 py-1 text-ide-regular text-foreground outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]'
                 />
               </SettingsCardShell>

@@ -481,14 +481,29 @@ private fun normalizeAdapterStartupException(error: Exception, startupOutput: Li
     return IllegalStateException("[AUTH_REQUIRED] Authentication required")
 }
 
+/**
+ * Probe-session working directory, in the string form the adapter process expects. LOCAL
+ * always uses the host-side probe dir; WSL must use a path native to that environment - the
+ * host-side dir isn't a valid absolute path from a WSL agent's point of view.
+ */
+private suspend fun AcpClientService.resolveProbeSessionCwd(): String {
+    val target = AcpAdapterPaths.getExecutionTarget()
+    if (target != AcpExecutionTarget.WSL) {
+        return resolveSessionCwd(AcpAdapterPaths.getProbeSessionDir().absolutePath)
+    }
+    val eel = AcpEelEnvironment.resolveWslEelApi(project)
+    val probeDir = AcpEelEnvironment.runtimeDir(eel).resolve("probe-sessions")
+    java.nio.file.Files.createDirectories(probeDir)
+    return AcpEelEnvironment.targetPathString(probeDir)
+}
+
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
     protocol: Protocol,
     client: Client,
     adapterInfo: AcpAdapterConfig.AdapterInfo
 ): AcpClientService.AdapterRuntimeMetadata {
-    val probeDir = AcpAdapterPaths.getProbeSessionDir()
-    val cwd = resolveSessionCwd(probeDir.absolutePath)
+    val cwd = resolveProbeSessionCwd()
     val result = protocol.newSessionRaw(cwd)
     val sessionId = result["sessionId"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
     if (sessionId.isEmpty()) {
@@ -517,7 +532,7 @@ private suspend fun AcpClientService.cleanupProbeSessions(
     client: Client,
     adapterInfo: AcpAdapterConfig.AdapterInfo
 ): Unit {
-    val cwd = resolveSessionCwd(AcpAdapterPaths.getProbeSessionDir().absolutePath)
+    val cwd = resolveProbeSessionCwd()
     val sessions = runCatching {
         client.listSessions(cwd = cwd).toList()
     }.getOrDefault(emptyList())

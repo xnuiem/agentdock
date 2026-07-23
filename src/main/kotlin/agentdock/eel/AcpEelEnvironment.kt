@@ -60,14 +60,21 @@ internal object AcpEelEnvironment {
             )
         }
         val configuredDistro = AcpExecutionMode.wslDistro()
-        if (!configuredDistro.isNullOrBlank() && !descriptor.name.equals(configuredDistro, ignoreCase = true)) {
+        // EelDescriptor.name for WSL is a display label like "WSL: Ubuntu-24.04", not the bare
+        // distro name a user would type - normalize both sides before comparing so this field is
+        // an optional sanity pin, not a fragile exact-string match.
+        if (!configuredDistro.isNullOrBlank() && !normalizeDistroName(descriptor.name).equals(normalizeDistroName(configuredDistro), ignoreCase = true)) {
             throw UnsupportedWslProjectException(
                 "Agent Dock is configured to use WSL distribution '$configuredDistro', but this project " +
-                    "is open from '${descriptor.name}'. Update the WSL distribution in settings or reopen the project."
+                    "is open from '${descriptor.name}'. Update the WSL distribution in settings, or clear it to " +
+                    "just use whichever distro the project is already open from."
             )
         }
         return descriptor
     }
+
+    private fun normalizeDistroName(name: String): String =
+        name.trim().removePrefix("WSL:").removePrefix("WSL").trim()
 
     /** Native runtime directory for downloaded adapters inside the resolved WSL environment. */
     fun runtimeDir(eel: EelApi): Path = EelPathUtils.getHomePath(eel.descriptor).resolve(".agent-dock")
