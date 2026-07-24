@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { AgentOption, ChatTab } from '../../types/chat';
 import { getTabIcon } from './TabIcons';
 
@@ -131,7 +131,7 @@ export function TabItem({
           ${tabRadiusClassName} text-left cursor-default focus:outline-none`}
       >
         <div className={`flex shrink-0 items-center relative left-[1px] ${iconOffsetClassName} opacity-80`}>
-          {getTabIcon(tab, agents)}
+          {hasProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : getTabIcon(tab, agents)}
         </div>
         <div className={`min-w-0 flex-1 overflow-hidden ${titleClassName}`}>
           {isEditing ? (
