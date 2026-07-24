@@ -1,8 +1,28 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Archive, RefreshCw } from 'lucide-react';
 import { ChatTab, HistorySessionMeta, TabUiFlags } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
 import { deriveKanbanColumn, KanbanColumn } from './deriveKanbanColumn';
+
+const ARCHIVED_STORAGE_KEY = 'agentdock.kanban.archivedConversationIds';
+
+function loadArchivedIds(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(ARCHIVED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveArchivedIds(ids: Set<string>) {
+  try {
+    window.localStorage.setItem(ARCHIVED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // Ignore - archiving is a convenience, not critical persistence.
+  }
+}
 
 const FALLBACK_UI: TabUiFlags = {
   unread: false,
@@ -20,7 +40,7 @@ const COLUMNS: { id: KanbanColumn; label: string; dotClassName: string; borderCl
   { id: 'question', label: 'Question', dotClassName: 'bg-warning', borderClassName: 'border-l-warning' },
   { id: 'error', label: 'Error', dotClassName: 'bg-error', borderClassName: 'border-l-error' },
   { id: 'review', label: 'Review', dotClassName: 'bg-violet-500', borderClassName: 'border-l-violet-500' },
-  { id: 'done', label: 'Done', dotClassName: 'bg-success', borderClassName: 'border-l-success' },
+  { id: 'done', label: 'Archive', dotClassName: 'bg-success', borderClassName: 'border-l-success' },
 ];
 
 interface LiveCard {
@@ -49,6 +69,16 @@ interface KanbanBoardViewProps {
 export function KanbanBoardView({ tabs, tabUi, onSelectTab, onOpenHistorySession }: KanbanBoardViewProps) {
   const [historyList, setHistoryList] = useState<HistorySessionMeta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(loadArchivedIds);
+
+  const handleArchive = (conversationId: string) => {
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      next.add(conversationId);
+      saveArchivedIds(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const unsubscribe = ACPBridge.onHistoryList((e) => {
@@ -61,7 +91,9 @@ export function KanbanBoardView({ tabs, tabUi, onSelectTab, onOpenHistorySession
 
   const chatTabs = tabs.filter((tab) => tab.type === 'chat');
   const liveConversationKeys = new Set(chatTabs.map((tab) => tab.historySession?.conversationId ?? tab.conversationId));
-  const doneHistoryItems = historyList.filter((item) => !liveConversationKeys.has(item.conversationId));
+  const doneHistoryItems = historyList.filter(
+    (item) => !liveConversationKeys.has(item.conversationId) && !archivedIds.has(item.conversationId)
+  );
 
   const cardsByColumn: Record<KanbanColumn, KanbanCard[]> = {
     ready: [],
@@ -109,32 +141,52 @@ export function KanbanBoardView({ tabs, tabUi, onSelectTab, onOpenHistorySession
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {cards.map((card) => (
-                    <button
+                    <div
                       key={card.kind === 'live' ? card.tab.id : card.item.conversationId}
-                      type="button"
-                      onClick={() => card.kind === 'live' ? onSelectTab(card.tab.id) : onOpenHistorySession(card.item)}
-                      className={`w-full rounded-[4px] border border-[var(--ide-Button-startBorderColor)] border-l-2 ${column.borderClassName} bg-background p-2
-                        text-left transition-colors hover:bg-hover focus:outline-none
-                        focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]`}
+                      className="group relative"
                     >
-                      <div className="text-ide-small font-medium truncate">
-                        {card.kind === 'live' ? card.tab.title : card.item.title}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground-secondary">
-                        <span className="truncate">
-                          {card.kind === 'live' ? (tabUi[card.tab.id]?.adapterDisplayName || card.tab.agentId) : card.item.adapterName}
-                        </span>
-                        {card.kind === 'live' && tabUi[card.tab.id]?.modelId ? (
-                          <>
-                            <span className="opacity-50">&bull;</span>
-                            <span className="truncate">{tabUi[card.tab.id]?.modelId}</span>
-                          </>
+                      <button
+                        type="button"
+                        onClick={() => card.kind === 'live' ? onSelectTab(card.tab.id) : onOpenHistorySession(card.item)}
+                        className={`w-full rounded-[4px] border border-[var(--ide-Button-startBorderColor)] border-l-2 ${column.borderClassName} bg-background p-2
+                          text-left transition-colors hover:bg-hover focus:outline-none
+                          focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]`}
+                      >
+                        <div className={`text-ide-small font-medium truncate ${card.kind === 'historical' ? 'pr-5' : ''}`}>
+                          {card.kind === 'live' ? card.tab.title : card.item.title}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-foreground-secondary">
+                          <span className="truncate">
+                            {card.kind === 'live' ? (tabUi[card.tab.id]?.adapterDisplayName || card.tab.agentId) : card.item.adapterName}
+                          </span>
+                          {card.kind === 'live' && tabUi[card.tab.id]?.modelId ? (
+                            <>
+                              <span className="opacity-50">&bull;</span>
+                              <span className="truncate">{tabUi[card.tab.id]?.modelId}</span>
+                            </>
+                          ) : null}
+                        </div>
+                        {card.kind === 'historical' ? (
+                          <div className="mt-1 text-xs text-foreground-secondary">{formatUpdatedAt(card.item.updatedAt)}</div>
                         ) : null}
-                      </div>
+                      </button>
                       {card.kind === 'historical' ? (
-                        <div className="mt-1 text-xs text-foreground-secondary">{formatUpdatedAt(card.item.updatedAt)}</div>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleArchive(card.item.conversationId);
+                          }}
+                          className="absolute right-1.5 top-1.5 rounded-sm p-0.5 text-foreground-secondary opacity-0
+                            transition-colors hover:text-foreground group-hover:opacity-100 focus:outline-none
+                            focus-visible:opacity-100 focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                          aria-label="Archive session"
+                          title="Archive"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
                       ) : null}
-                    </button>
+                    </div>
                   ))}
                   {cards.length === 0 ? (
                     <div className="px-1 py-2 text-xs text-foreground-secondary">No sessions</div>
