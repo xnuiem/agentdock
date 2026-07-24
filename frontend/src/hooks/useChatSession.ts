@@ -37,13 +37,36 @@ import { QueuedPrompt } from './chatSession/promptQueueTypes';
 
 const EMPTY_ADAPTER_NAMES: string[] = [];
 const APPROVAL_MODE_STORAGE_KEY = 'chat-approval-mode';
+const APPROVAL_MODE_BY_AGENT_STORAGE_KEY = 'chat-approval-mode-by-agent';
 
-function loadApprovalMode(): ApprovalMode {
+// Legacy single global value - used as the default for any agent that has no remembered choice yet,
+// so upgrading users keep their previous behavior.
+function loadLegacyApprovalMode(): ApprovalMode {
   return localStorage.getItem(APPROVAL_MODE_STORAGE_KEY) === 'auto' ? 'auto' : 'ask';
 }
 
-function saveApprovalMode(mode: ApprovalMode) {
-  localStorage.setItem(APPROVAL_MODE_STORAGE_KEY, mode);
+function loadApprovalModesByAgent(): Record<string, ApprovalMode> {
+  try {
+    const raw = localStorage.getItem(APPROVAL_MODE_BY_AGENT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveApprovalModesByAgent(map: Record<string, ApprovalMode>) {
+  try {
+    localStorage.setItem(APPROVAL_MODE_BY_AGENT_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // Approval memory is a convenience; ignore storage failures.
+  }
+}
+
+// Approval mode is remembered per agent, keyed by adapter + selected mode (opencode's custom agents
+// are modes), so switching agents restores that agent's Ask/Auto choice - symmetric with the model.
+function approvalModeKey(adapterId: string, modeId: string): string {
+  return `${adapterId || ''}::${modeId || ''}`;
 }
 
 function normalizePermissionText(value: string): string {
@@ -109,7 +132,8 @@ export function useChatSession(
   const [isSending, setIsSending] = useState(false);
   const [isHistoryReplaying, setIsHistoryReplaying] = useState(!!historySession);
   const [permissionQueue, setPermissionQueue] = useState<PermissionRequest[]>([]);
-  const [approvalMode, setApprovalModeState] = useState<ApprovalMode>(loadApprovalMode);
+  const [approvalModeByAgent, setApprovalModeByAgent] = useState<Record<string, ApprovalMode>>(loadApprovalModesByAgent);
+  const legacyApprovalModeRef = useRef<ApprovalMode>(loadLegacyApprovalMode());
   const permissionRequest = permissionQueue[0] ?? null;
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [acpSessionId, setAcpSessionId] = useState<string>('');
@@ -145,10 +169,6 @@ export function useChatSession(
     markFlushUnscheduled,
   } = useBufferedMessageChunks({ setHistoryMessages, setLiveMessages });
 
-  const setApprovalMode = useCallback((mode: ApprovalMode) => {
-    setApprovalModeState(mode);
-    saveApprovalMode(mode);
-  }, []);
 
   const finishActivePromptAfterError = useCallback(() => {
     pendingPromptRef.current = null;
@@ -211,6 +231,19 @@ export function useChatSession(
     selectedAgentId,
     historySession,
   });
+
+  // Approval mode follows the selected agent: each (adapter, mode) remembers its own Ask/Auto choice,
+  // falling back to the legacy global default for agents the user hasn't set yet.
+  const currentApprovalKey = approvalModeKey(selectedAgentId, selectedModeId);
+  const approvalMode: ApprovalMode = approvalModeByAgent[currentApprovalKey] ?? legacyApprovalModeRef.current;
+  const setApprovalMode = useCallback((mode: ApprovalMode) => {
+    setApprovalModeByAgent((prev) => {
+      if (prev[currentApprovalKey] === mode) return prev;
+      const next = { ...prev, [currentApprovalKey]: mode };
+      saveApprovalModesByAgent(next);
+      return next;
+    });
+  }, [currentApprovalKey]);
 
   const adapterDisplayName = resolvedSelectedAgent?.name || '';
   const agentOptions = useMemo(
