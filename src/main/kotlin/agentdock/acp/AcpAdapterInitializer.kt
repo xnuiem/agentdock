@@ -456,6 +456,17 @@ private suspend fun AcpClientService.launchAdapterProcessOverWsl(
         launchFileTarget to adapterInfo.args
     }
 
+    // The process's OS-level working directory must be the project root, not the adapter's own
+    // runtime/install dir - most agent CLIs (OpenCode, Kilo) discover project-local custom-agent
+    // config (.opencode/, .kilo/) relative to their own process cwd, not the ACP session's cwd
+    // parameter. LOCAL mode already gets this right via resolveAdapterProcessWorkingDirectory;
+    // mirror it here instead of defaulting to runtimeDir.
+    val projectDir = project.basePath
+        ?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { java.nio.file.Path.of(it) }.getOrNull() }
+        ?.takeIf { Files.isDirectory(it) }
+        ?: runtimeDir
+
     // baseEnvironment() is Windows-shaped (System.getenv() + host shell env) - handing that to
     // a WSL process stomps its real PATH and breaks even the shebang interpreter lookup (node,
     // env). Leave env empty so the WSL environment's own login/shell environment applies.
@@ -463,7 +474,7 @@ private suspend fun AcpClientService.launchAdapterProcessOverWsl(
         eel = eel,
         executable = executable,
         args = args,
-        workingDirectory = runtimeDir,
+        workingDirectory = projectDir,
         environment = emptyMap()
     )
     return proc to AcpEelEnvironment.targetPathString(adapterRoot)
