@@ -14,13 +14,13 @@ const FALLBACK_UI: TabUiFlags = {
   hasPendingReview: false,
 };
 
-const COLUMNS: { id: KanbanColumn; label: string }[] = [
-  { id: 'ready', label: 'Ready' },
-  { id: 'running', label: 'Running' },
-  { id: 'question', label: 'Question' },
-  { id: 'error', label: 'Error' },
-  { id: 'review', label: 'Review' },
-  { id: 'done', label: 'Done' },
+const COLUMNS: { id: KanbanColumn; label: string; dotClassName: string; borderClassName: string }[] = [
+  { id: 'ready', label: 'Ready', dotClassName: 'bg-foreground-secondary', borderClassName: 'border-l-foreground-secondary' },
+  { id: 'running', label: 'Running', dotClassName: 'bg-sky-500', borderClassName: 'border-l-sky-500' },
+  { id: 'question', label: 'Question', dotClassName: 'bg-warning', borderClassName: 'border-l-warning' },
+  { id: 'error', label: 'Error', dotClassName: 'bg-error', borderClassName: 'border-l-error' },
+  { id: 'review', label: 'Review', dotClassName: 'bg-violet-500', borderClassName: 'border-l-violet-500' },
+  { id: 'done', label: 'Done', dotClassName: 'bg-success', borderClassName: 'border-l-success' },
 ];
 
 interface LiveCard {
@@ -101,7 +101,10 @@ export function KanbanBoardView({ tabs, tabUi, onSelectTab, onOpenHistorySession
             return (
               <div key={column.id} className="flex w-[260px] shrink-0 flex-col rounded-ide border border-border bg-background-secondary">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-                  <span className="text-ide-small font-semibold">{column.label}</span>
+                  <span className="flex items-center gap-2 text-ide-small font-semibold">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${column.dotClassName}`} />
+                    {column.label}
+                  </span>
                   <span className="text-xs text-foreground-secondary">{cards.length}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -110,9 +113,9 @@ export function KanbanBoardView({ tabs, tabUi, onSelectTab, onOpenHistorySession
                       key={card.kind === 'live' ? card.tab.id : card.item.conversationId}
                       type="button"
                       onClick={() => card.kind === 'live' ? onSelectTab(card.tab.id) : onOpenHistorySession(card.item)}
-                      className="w-full rounded-[4px] border border-[var(--ide-Button-startBorderColor)] bg-background p-2
+                      className={`w-full rounded-[4px] border border-[var(--ide-Button-startBorderColor)] border-l-2 ${column.borderClassName} bg-background p-2
                         text-left transition-colors hover:bg-hover focus:outline-none
-                        focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                        focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]`}
                     >
                       <div className="text-ide-small font-medium truncate">
                         {card.kind === 'live' ? card.tab.title : card.item.title}
