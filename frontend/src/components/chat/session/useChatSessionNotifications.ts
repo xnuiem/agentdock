@@ -8,11 +8,18 @@ interface UseChatSessionNotificationsOptions {
   permissionRequest: PermissionRequest | null;
   acpSessionId: string;
   adapterName: string;
+  status: string;
+  hasPendingReview: boolean;
+  modelId?: string;
+  adapterDisplayName?: string;
   onAssistantActivity?: () => void;
   onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   onPermissionRequestChange?: (hasPendingPermission: boolean) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
+  onStatusChange?: (status: string) => void;
+  onReviewChange?: (hasPendingReview: boolean) => void;
+  onSessionMetaChange?: (meta: { modelId?: string; adapterDisplayName?: string }) => void;
   onSessionStateChange?: (state: { acpSessionId: string; adapterName: string }) => void;
 }
 
@@ -23,11 +30,18 @@ export function useChatSessionNotifications({
   permissionRequest,
   acpSessionId,
   adapterName,
+  status,
+  hasPendingReview,
+  modelId,
+  adapterDisplayName,
   onAssistantActivity,
   onAtBottomChange,
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
+  onStatusChange,
+  onReviewChange,
+  onSessionMetaChange,
   onSessionStateChange,
 }: UseChatSessionNotificationsOptions) {
   const lastReportedSessionStateRef = useRef('');
@@ -94,6 +108,18 @@ export function useChatSessionNotifications({
   useEffect(() => {
     onPermissionRequestChange?.(!!permissionRequest);
   }, [permissionRequest, onPermissionRequestChange]);
+
+  useEffect(() => {
+    onStatusChange?.(status);
+  }, [status, onStatusChange]);
+
+  useEffect(() => {
+    onReviewChange?.(hasPendingReview);
+  }, [hasPendingReview, onReviewChange]);
+
+  useEffect(() => {
+    onSessionMetaChange?.({ modelId, adapterDisplayName });
+  }, [modelId, adapterDisplayName, onSessionMetaChange]);
 
   useEffect(() => {
     permissionRequestChangeRef.current = onPermissionRequestChange;

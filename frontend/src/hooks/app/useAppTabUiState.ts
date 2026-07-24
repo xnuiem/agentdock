@@ -1,7 +1,15 @@
 import { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { TabUiFlags } from '../../types/chat';
 
-const DEFAULT_TAB_UI: TabUiFlags = { unread: false, atBottom: true, canMarkRead: true, warning: false, processing: false };
+const DEFAULT_TAB_UI: TabUiFlags = {
+  unread: false,
+  atBottom: true,
+  canMarkRead: true,
+  warning: false,
+  processing: false,
+  status: 'not started',
+  hasPendingReview: false,
+};
 
 export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRefObject<string>) {
   const [tabUi, setTabUi] = useState<Record<string, TabUiFlags>>({});
@@ -140,6 +148,30 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     });
   }, []);
 
+  const handleStatusChange = useCallback((tabId: string, status: string) => {
+    setTabUi(prev => {
+      const current = prev[tabId];
+      if (!current || current.status === status) return prev;
+      return { ...prev, [tabId]: { ...current, status } };
+    });
+  }, []);
+
+  const handleReviewChange = useCallback((tabId: string, hasPendingReview: boolean) => {
+    setTabUi(prev => {
+      const current = prev[tabId];
+      if (!current || current.hasPendingReview === hasPendingReview) return prev;
+      return { ...prev, [tabId]: { ...current, hasPendingReview } };
+    });
+  }, []);
+
+  const handleSessionMetaChange = useCallback((tabId: string, meta: { modelId?: string; adapterDisplayName?: string }) => {
+    setTabUi(prev => {
+      const current = prev[tabId];
+      if (!current || (current.modelId === meta.modelId && current.adapterDisplayName === meta.adapterDisplayName)) return prev;
+      return { ...prev, [tabId]: { ...current, modelId: meta.modelId, adapterDisplayName: meta.adapterDisplayName } };
+    });
+  }, []);
+
   const handlePermissionRequestChange = useCallback((tabId: string, hasPendingPermission: boolean) => {
     pendingPermissionRef.current[tabId] = hasPendingPermission;
     setTabUi(prev => {
@@ -179,5 +211,8 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleStatusChange,
+    handleReviewChange,
+    handleSessionMetaChange,
   };
 }

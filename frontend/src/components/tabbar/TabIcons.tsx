@@ -1,4 +1,4 @@
-import { Bookmark, Bot, FileText, History, Network, Palette, SlidersHorizontal } from 'lucide-react';
+import { Bookmark, Bot, FileText, History, Kanban, Network, Palette, SlidersHorizontal } from 'lucide-react';
 import { AgentOption, ChatTab } from '../../types/chat';
 import { sanitizeSvg } from '../../utils/sanitizeHtml';
 
@@ -9,6 +9,7 @@ export const HistoryTabIcon = () => <History size={14} className="text-foregroun
 export const PromptLibraryTabIcon = () => <Bookmark size={14} className="text-foreground/70 flex-shrink-0" />;
 export const SystemInstructionsTabIcon = () => <FileText size={14} className="text-foreground/70 flex-shrink-0" />;
 export const SettingsTabIcon = () => <SlidersHorizontal size={14} className="text-foreground/70 flex-shrink-0" />;
+export const KanbanTabIcon = () => <Kanban size={14} className="text-foreground/70 flex-shrink-0" />;
 
 export const getAgentIcon = (agentId: string | undefined, agents: AgentOption[]) => {
   const agent = agentId ? agents.find(a => a.id === agentId) : undefined;
@@ -31,5 +32,6 @@ export const getTabIcon = (tab: ChatTab, agents: AgentOption[]) => {
   if (tab.type === 'prompt-library') return <PromptLibraryTabIcon />;
   if (tab.type === 'system-instructions') return <SystemInstructionsTabIcon />;
   if (tab.type === 'settings') return <SettingsTabIcon />;
+  if (tab.type === 'kanban') return <KanbanTabIcon />;
   return getAgentIcon(tab.agentId, agents);
 };

@@ -2,6 +2,7 @@ import { RefObject } from 'react';
 import {
   DesignTabIcon,
   HistoryTabIcon,
+  KanbanTabIcon,
   ManagementTabIcon,
   McpTabIcon,
   PromptLibraryTabIcon,
@@ -27,6 +28,7 @@ interface HamburgerMenuPanelProps {
   onOpenPromptLibrary: () => void;
   onOpenSystemInstructions: () => void;
   onOpenSettings: () => void;
+  onOpenKanban: () => void;
 }
 
 export function HamburgerMenuPanel({
@@ -40,11 +42,13 @@ export function HamburgerMenuPanel({
   onOpenPromptLibrary,
   onOpenSystemInstructions,
   onOpenSettings,
+  onOpenKanban,
 }: HamburgerMenuPanelProps) {
   const isDev = !!(window as any).__IS_DEV;
 
   const actions: MenuAction[] = [
     { label: 'History', icon: <HistoryTabIcon />, onClick: onOpenHistory },
+    { label: 'Kanban Board', icon: <KanbanTabIcon />, onClick: onOpenKanban },
     { label: 'Service Providers', icon: <ManagementTabIcon />, onClick: onOpenManagement },
     { label: 'Settings', icon: <SettingsTabIcon />, onClick: onOpenSettings },
     { label: 'Prompt Library', icon: <PromptLibraryTabIcon />, onClick: onOpenPromptLibrary },

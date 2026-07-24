@@ -70,6 +70,9 @@ function App() {
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleStatusChange,
+    handleReviewChange,
+    handleSessionMetaChange,
     requestAgentSwitch,
     handleHandoffConsumed,
     handleForkRequest,
@@ -107,6 +110,7 @@ function App() {
         onOpenPromptLibrary={() => openSingletonTab('prompt-library', 'Prompt Library')}
         onOpenSystemInstructions={() => openSingletonTab('system-instructions', 'System Instructions')}
         onOpenSettings={() => openSingletonTab('settings', 'Settings')}
+        onOpenKanban={() => openSingletonTab('kanban', 'Kanban Board')}
       />
 
       <div className="flex-1 relative min-h-0">
@@ -119,10 +123,13 @@ function App() {
               key={tab.id}
               tab={tab}
               isActive={isTabActive}
+              tabs={tabs}
+              tabUi={tabUi}
               availableAgents={availableAgents}
               runnableAgents={runnableAgents}
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onOpenHistory={handleOpenHistory}
+              onSelectTab={handleSelectTab}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
               onRenamed={(title) => handleTabRenamed(tab.id, title)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}
@@ -130,6 +137,9 @@ function App() {
               onCanMarkReadChange={(canMarkRead) => handleCanMarkReadChange(tab.id, canMarkRead)}
               onPermissionRequestChange={(hasPendingPermission) => handlePermissionRequestChange(tab.id, hasPendingPermission)}
               onProcessingChange={(isProcessing) => handleProcessingChange(tab.id, isProcessing)}
+              onStatusChange={(status) => handleStatusChange(tab.id, status)}
+              onReviewChange={(hasPendingReview) => handleReviewChange(tab.id, hasPendingReview)}
+              onSessionMetaChange={(meta) => handleSessionMetaChange(tab.id, meta)}
               onAgentChangeRequest={(payload) => requestAgentSwitch(tab.id, payload)}
               onForkRequest={(payload) => handleForkRequest(tab.id, payload)}
               onHandoffConsumed={(handoffId) => handleHandoffConsumed(tab.id, handoffId)}

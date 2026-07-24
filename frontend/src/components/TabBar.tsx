@@ -31,6 +31,7 @@ interface TabBarProps {
   onOpenPromptLibrary: () => void;
   onOpenSystemInstructions: () => void;
   onOpenSettings: () => void;
+  onOpenKanban: () => void;
 }
 
 export default function TabBar({
@@ -51,7 +52,8 @@ export default function TabBar({
   onOpenMcp,
   onOpenPromptLibrary,
   onOpenSystemInstructions,
-  onOpenSettings
+  onOpenSettings,
+  onOpenKanban
 }: TabBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hamburgerMenuOpen, setHamburgerMenuOpen] = useState(false);
@@ -384,6 +386,7 @@ export default function TabBar({
               onOpenPromptLibrary={onOpenPromptLibrary}
               onOpenSystemInstructions={onOpenSystemInstructions}
               onOpenSettings={onOpenSettings}
+              onOpenKanban={onOpenKanban}
             />
           )}
         </div>

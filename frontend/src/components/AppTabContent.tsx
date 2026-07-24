@@ -1,8 +1,9 @@
 import { useRef } from 'react';
-import { AgentOption, ChatTab, PendingHandoffContext } from '../types/chat';
+import { AgentOption, ChatTab, PendingHandoffContext, TabUiFlags } from '../types/chat';
 import { AgentManagementView } from './AgentManagement';
 import { DesignSystemView } from './DesignSystem';
 import HistoryPanel from './HistoryPanel';
+import { KanbanBoardView } from './kanban/KanbanBoardView';
 import { McpServersView } from './McpServersView';
 import { PromptLibraryView } from './PromptLibraryView';
 import { SettingsView } from './SettingsView';
@@ -12,10 +13,13 @@ import ChatSessionView from './chat/ChatSessionView';
 interface AppTabContentProps {
   tab: ChatTab;
   isActive: boolean;
+  tabs: ChatTab[];
+  tabUi: Record<string, TabUiFlags>;
   availableAgents: AgentOption[];
   runnableAgents: AgentOption[];
   pendingHandoff?: PendingHandoffContext;
   onOpenHistory: Parameters<typeof HistoryPanel>[0]['onOpenSession'];
+  onSelectTab: (id: string) => void;
   onUserMessageSent: () => void;
   onRenamed: (title: string) => void;
   onAssistantActivity: () => void;
@@ -23,6 +27,9 @@ interface AppTabContentProps {
   onCanMarkReadChange: (canMarkRead: boolean) => void;
   onPermissionRequestChange: (hasPendingPermission: boolean) => void;
   onProcessingChange: (isProcessing: boolean) => void;
+  onStatusChange: (status: string) => void;
+  onReviewChange: (hasPendingReview: boolean) => void;
+  onSessionMetaChange: (meta: { modelId?: string; adapterDisplayName?: string }) => void;
   onAgentChangeRequest: Parameters<typeof ChatSessionView>[0]['onAgentChangeRequest'];
   onForkRequest: Parameters<typeof ChatSessionView>[0]['onForkRequest'];
   onHandoffConsumed: (handoffId: string) => void;
@@ -32,10 +39,13 @@ interface AppTabContentProps {
 export function AppTabContent({
   tab,
   isActive,
+  tabs,
+  tabUi,
   availableAgents,
   runnableAgents,
   pendingHandoff,
   onOpenHistory,
+  onSelectTab,
   onUserMessageSent,
   onRenamed,
   onAssistantActivity,
@@ -43,6 +53,9 @@ export function AppTabContent({
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
+  onStatusChange,
+  onReviewChange,
+  onSessionMetaChange,
   onAgentChangeRequest,
   onForkRequest,
   onHandoffConsumed,
@@ -76,6 +89,9 @@ export function AppTabContent({
           onCanMarkReadChange={onCanMarkReadChange}
           onPermissionRequestChange={onPermissionRequestChange}
           onProcessingChange={onProcessingChange}
+          onStatusChange={onStatusChange}
+          onReviewChange={onReviewChange}
+          onSessionMetaChange={onSessionMetaChange}
           onAgentChangeRequest={onAgentChangeRequest}
           onForkRequest={onForkRequest}
           onHandoffConsumed={onHandoffConsumed}
@@ -90,6 +106,9 @@ export function AppTabContent({
             <HistoryPanel availableAgents={availableAgents} onOpenSession={onOpenHistory} />
           )}
           {tab.type === 'mcp' && <McpServersView />}
+          {tab.type === 'kanban' && (
+            <KanbanBoardView tabs={tabs} tabUi={tabUi} onSelectTab={onSelectTab} onOpenHistorySession={onOpenHistory} />
+          )}
           {tab.type === 'prompt-library' && <PromptLibraryView />}
           {tab.type === 'system-instructions' && <SystemInstructionsView />}
           {tab.type === 'settings' && <SettingsView />}

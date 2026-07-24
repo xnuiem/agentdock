@@ -177,9 +177,13 @@ export interface TabUiFlags {
   canMarkRead: boolean;
   warning: boolean;
   processing: boolean;
+  status: string;
+  hasPendingReview: boolean;
+  modelId?: string;
+  adapterDisplayName?: string;
 }
 
-export type TabType = 'chat' | 'management' | 'design' | 'history' | 'mcp' | 'system-instructions' | 'prompt-library' | 'settings';
+export type TabType = 'chat' | 'management' | 'design' | 'history' | 'mcp' | 'system-instructions' | 'prompt-library' | 'settings' | 'kanban';
 
 export interface ChatTab {
   id: string;

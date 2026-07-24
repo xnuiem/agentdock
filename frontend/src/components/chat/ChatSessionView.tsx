@@ -40,6 +40,9 @@ interface ChatSessionProps {
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   onPermissionRequestChange?: (hasPendingPermission: boolean) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
+  onStatusChange?: (status: string) => void;
+  onReviewChange?: (hasPendingReview: boolean) => void;
+  onSessionMetaChange?: (meta: { modelId?: string; adapterDisplayName?: string }) => void;
   onAgentChangeRequest?: (payload: { agentId: string; handoffText: string }) => void;
   onForkRequest?: (payload: { agentId: string; messages: Message[]; handoffText: string }) => void;
   onHandoffConsumed?: (handoffId: string) => void;
@@ -64,6 +67,9 @@ export default function ChatSessionView({
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
+  onStatusChange,
+  onReviewChange,
+  onSessionMetaChange,
   onAgentChangeRequest,
   onForkRequest,
   onHandoffConsumed,
@@ -188,11 +194,18 @@ export default function ChatSessionView({
     permissionRequest,
     acpSessionId,
     adapterName,
+    status,
+    hasPendingReview: hasPluginEdits,
+    modelId: selectedModelId,
+    adapterDisplayName,
     onAssistantActivity,
     onAtBottomChange,
     onCanMarkReadChange,
     onPermissionRequestChange,
     onProcessingChange,
+    onStatusChange,
+    onReviewChange,
+    onSessionMetaChange,
     onSessionStateChange,
   });
 
