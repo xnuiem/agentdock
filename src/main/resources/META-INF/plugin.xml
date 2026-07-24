@@ -1,8 +1,8 @@
 <idea-plugin>
     <id>agentdock</id>
     <name>Agent Dock</name>
-    <version>1.4.0</version>
-    <vendor url="https://github.com/edgarsr/agentdock">EdgarsR</vendor>
+    <version>1.5.0</version>
+    <vendor url="https://github.com/edgarsr/agentdock">EdgarsR, Xnuiem</vendor>
 
     <description><![CDATA[
         <p>Agent Dock brings widely used AI coding agents into a unified GUI that follows the active JetBrains IDE theme.</p>
