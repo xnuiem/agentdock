@@ -17,6 +17,7 @@ interface AppTabContentProps {
   pendingHandoff?: PendingHandoffContext;
   onOpenHistory: Parameters<typeof HistoryPanel>[0]['onOpenSession'];
   onUserMessageSent: () => void;
+  onRenamed: (title: string) => void;
   onAssistantActivity: () => void;
   onAtBottomChange: (isAtBottom: boolean) => void;
   onCanMarkReadChange: (canMarkRead: boolean) => void;
@@ -36,6 +37,7 @@ export function AppTabContent({
   pendingHandoff,
   onOpenHistory,
   onUserMessageSent,
+  onRenamed,
   onAssistantActivity,
   onAtBottomChange,
   onCanMarkReadChange,
@@ -68,6 +70,7 @@ export function AppTabContent({
           availableAgents={runnableAgents}
           isActive={isActive}
           onUserMessageSent={onUserMessageSent}
+          onRenamed={onRenamed}
           onAssistantActivity={onAssistantActivity}
           onAtBottomChange={onAtBottomChange}
           onCanMarkReadChange={onCanMarkReadChange}

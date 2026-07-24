@@ -462,6 +462,8 @@ export interface GlobalSettings {
   audioTranscription: AudioTranscriptionSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
   quotaWidgetEnabled: boolean;
+  executionTarget: 'local' | 'wsl';
+  wslDistro: string;
 }
 
 export interface GlobalSettingsPayload {
@@ -501,7 +503,7 @@ declare global {
     __requestHistoryList?: (projectPath?: string) => void;
     __syncHistoryList?: (projectPath?: string) => void;
     __deleteHistoryConversations?: (payload: { projectPath: string; conversationIds: string[] }) => void;
-    __renameHistoryConversation?: (payload: { projectPath: string; conversationId: string; newTitle: string }) => void;
+    __renameHistoryConversation?: (payload: { projectPath?: string; conversationId: string; newTitle: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
     __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string) => void;

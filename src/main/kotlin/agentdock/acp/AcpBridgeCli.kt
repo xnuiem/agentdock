@@ -120,6 +120,9 @@ internal fun buildAdapterCliCommandParts(
     val adapterInfo = runCatching { AcpAdapterConfig.getAdapterInfo(adapterId) }.getOrNull() ?: return null
     val cli = adapterInfo.cli ?: return null
     val target = AcpAdapterPaths.getExecutionTarget()
+    // Terminal continuation launches a host-local shell command, which isn't valid for a WSL
+    // adapter root - that would need its own WSL-aware terminal launch, not wired up yet.
+    if (target == AcpExecutionTarget.WSL) return null
     val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId, target)
     if (!AcpAdapterPaths.isDownloaded(adapterId, target)) return null
 

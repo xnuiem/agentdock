@@ -4,14 +4,10 @@ import { ACPBridge } from '../utils/bridge';
 import ConfirmationModal from './ConfirmationModal';
 import { RefreshCw } from 'lucide-react';
 import { ClaudeUsage } from './usage/ClaudeUsage';
-import { CopilotUsage } from './usage/CopilotUsage';
-import { CodexUsage } from './usage/CodexUsage';
-import { CursorUsage } from './usage/CursorUsage';
-import { QoderUsage } from './usage/QoderUsage';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { SplitButton } from './ui/SplitButton';
-import { resetAdapterUsageCaches, useAdapterUsage } from '../hooks/useAdapterUsage';
+import { resetAdapterUsageCaches } from '../hooks/useAdapterUsage';
 
 function mergeAgentSnapshot(previous: AgentOption | undefined, next: AgentOption): AgentOption {
   if (!previous) return next;
@@ -90,25 +86,6 @@ const linkButtonFocusClassName = [
 function UsageSection({ children }: { children: React.ReactNode }) {
   return (
     <div className="-mt-[0.375rem] flex flex-wrap gap-x-4 gap-y-1 text-ide-small">{children}</div>
-  );
-}
-
-function CopilotUsageSection({ refreshKey }: { refreshKey: number }) {
-  const data = useAdapterUsage('github-copilot-cli');
-
-  if (data) {
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed?.quota_snapshots?.premium_interactions?.unlimited === true) return null;
-    } catch {
-      // Let CopilotUsage handle malformed data fallback.
-    }
-  }
-
-  return (
-    <UsageSection>
-      <CopilotUsage key={refreshKey} />
-    </UsageSection>
   );
 }
 
@@ -359,18 +336,6 @@ export function AgentManagementView({
                       {!isInstalling && isDownloaded && agent.ready === true && agent.id === 'claude-code' && (
                         <UsageSection>
                           <ClaudeUsage key={refreshKey} />
-                        </UsageSection>
-                      )}
-                      {!isInstalling && isDownloaded && agent.ready === true && agent.id === 'codex' && (
-                        <UsageSection>
-                          <CodexUsage key={refreshKey} />
-                        </UsageSection>
-                      )}
-                      {!isInstalling && isDownloaded && agent.ready === true && agent.id === 'github-copilot-cli' && <CopilotUsageSection refreshKey={refreshKey} />}
-                      {!isInstalling && isDownloaded && agent.ready === true && agent.id === 'cursor-cli' && <CursorUsage />}
-                      {!isInstalling && isDownloaded && agent.ready === true && agent.id === 'qoder' && (
-                        <UsageSection>
-                          <QoderUsage />
                         </UsageSection>
                       )}
 

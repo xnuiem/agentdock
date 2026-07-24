@@ -423,7 +423,7 @@ export const ACPBridge = {
     window.__deleteHistoryConversations?.({ projectPath, conversationIds });
   },
 
-  renameHistoryConversation: (projectPath: string, conversationId: string, newTitle: string) => {
+  renameHistoryConversation: (projectPath: string | undefined, conversationId: string, newTitle: string) => {
     window.__renameHistoryConversation?.({ projectPath, conversationId, newTitle });
   },
 

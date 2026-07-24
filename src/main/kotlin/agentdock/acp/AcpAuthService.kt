@@ -315,7 +315,11 @@ object AcpAuthService {
         adapterInfo: AcpAdapterConfig.AdapterInfo,
         projectPath: String? = null
     ): File? {
-        return resolveWorkingDir(adapterInfo, projectPath, AcpExecutionTarget.LOCAL)?.let(::File)
+        // Same guard as AcpAdapterInitializer.resolveAdapterProcessWorkingDirectory: these
+        // ProcessBuilder calls are host-local, so a WSL-routed working directory (from a
+        // WSL-opened project) must never be handed to them even when projectPath is passed in.
+        val file = resolveWorkingDir(adapterInfo, projectPath, AcpExecutionTarget.LOCAL)?.let(::File) ?: return null
+        return file.takeIf { com.intellij.platform.eel.provider.utils.EelPathUtils.isPathLocal(it.toPath()) }
     }
 
     private fun findNodeExecutable(target: AcpExecutionTarget): String {

@@ -7,12 +7,8 @@ The project's goal is to deliver a rich GUI experience for AI agents within JetB
 Currently supported AI agents:
 
 - Claude Code
-- Codex
-- Cursor
-- GitHub Copilot
 - Kilo
 - OpenCode
-- Qoder
 
 ## Features
 
@@ -25,7 +21,7 @@ Currently supported AI agents:
 - Code selections and file references can be added to chat from the editor and project view.
 - Images can be pasted into chat and previewed inline.
 - Live token quota and context usage are shown directly in the chat input while prompting, for agents that support it.
-  For Claude Code and Codex, quota data is fetched using the OAuth credentials.
+  For Claude Code, quota data is fetched using the OAuth credentials.
 - Voice input for prompts (Windows only).
 - Chats can be continued in the IDE terminal when CLI mode is a better fit.
 - Chat history supports opening, renaming, deleting, and bulk deletion.

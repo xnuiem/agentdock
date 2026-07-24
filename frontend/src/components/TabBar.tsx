@@ -19,6 +19,7 @@ interface TabBarProps {
   onSelectTab: (id: string) => void;
   onReorderTabs: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
   onCloseTab: (id: string) => void;
+  onRenameTab: (id: string, newTitle: string) => void;
   onCloseAllTabs: () => void;
   onNewTab: () => void;
   onNewTabWithAgent: (agentId: string) => void;
@@ -39,6 +40,7 @@ export default function TabBar({
   onSelectTab,
   onReorderTabs,
   onCloseTab,
+  onRenameTab,
   onCloseAllTabs,
   onNewTab,
   onNewTabWithAgent,
@@ -262,6 +264,7 @@ export default function TabBar({
               onPointerDown={handleTabPointerDown}
               shouldSuppressClick={(id) => suppressClickTabIdRef.current === id}
               onCloseTab={onCloseTab}
+              onRenameTab={onRenameTab}
               onFocusTab={(id) => setFocusedTabId(lastInteractionWasTabRef.current ? id : null)}
               onBlurTab={(id) => setFocusedTabId((current) => current === id ? null : current)}
               dropIndicator={dropTarget?.id === tab.id ? dropTarget.position : null}

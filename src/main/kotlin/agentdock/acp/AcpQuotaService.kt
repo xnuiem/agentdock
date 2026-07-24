@@ -68,8 +68,6 @@ class AcpQuotaService : Disposable {
                     try {
                         val rawJson = when (adapter.id) {
                             "claude-code" -> AcpUsageDataFetcher.fetchClaudeUsageData()
-                            "codex" -> AcpUsageDataFetcher.fetchCodexUsageData()
-                            "github-copilot-cli" -> AcpUsageDataFetcher.fetchCopilotUsageData(adapter.id)
                             else -> null
                         }
                         // Only update if we actually got a response, to avoid clearing bridge-pushed data
@@ -122,12 +120,6 @@ class AcpQuotaService : Disposable {
         return diff > -CLOCK_SKEW_MS && diff < MAX_DISPLAYABLE_RESET_MS
     }
 
-    private fun hasDisplayableQuotaResetAfterSeconds(seconds: Double?): Boolean {
-        if (seconds == null) return false
-        if (seconds <= 0) return true // "now" or "soon"
-        return seconds < MAX_DISPLAYABLE_RESET_MS / 1000.0
-    }
-
     private fun roundPercent(value: Double?): Int? = value?.let { Math.round(it).toInt().coerceIn(0, 100) }
 
     private fun parseUsageDetail(adapter: AcpAdapterConfig.AdapterInfo, rawJson: String): QuotaDetail? {
@@ -160,43 +152,6 @@ class AcpQuotaService : Disposable {
                             fiveHourPct != null -> fiveHourPct
                             else -> sevenDayPct ?: 0
                         }
-                    }
-                }
-                "codex" -> {
-                    val authType = (root["authType"] as? JsonPrimitive)?.contentOrNull
-                    val rateLimit = root["rate_limit"] as? JsonObject
-                    val primary = rateLimit?.get("primary_window") as? JsonObject
-                    val secondary = rateLimit?.get("secondary_window") as? JsonObject
-                    val primarySecs = (primary?.get("reset_after_seconds") as? JsonPrimitive)?.doubleOrNull
-                    val secondarySecs = (secondary?.get("reset_after_seconds") as? JsonPrimitive)?.doubleOrNull
-
-                    val primaryPct = if (hasDisplayableQuotaResetAfterSeconds(primarySecs)) {
-                        roundPercent((primary?.get("used_percent") as? JsonPrimitive)?.doubleOrNull)
-                    } else null
-                    val secondaryPct = if (hasDisplayableQuotaResetAfterSeconds(secondarySecs)) {
-                        roundPercent((secondary?.get("used_percent") as? JsonPrimitive)?.doubleOrNull)
-                    } else null
-
-                    primaryPct?.let {
-                        val label = if ((primarySecs ?: 0.0) >= 24.0 * 60 * 60) "7d" else "5h"
-                        details.add("$label: $it%")
-                    }
-                    secondaryPct?.let {
-                        val label = if ((secondarySecs ?: 0.0) >= 24.0 * 60 * 60) "7d" else "5h"
-                        val finalLabel = if (details.any { it.startsWith(label) }) {
-                            if (label == "5h") "7d" else "5h"
-                        } else label
-                        details.add("$finalLabel: $it%")
-                    }
-
-                    if (details.isEmpty() && authType != null) {
-                        details.add(if (authType == "api_key") "API Key" else "Subscription")
-                    }
-
-                    mainPercent = when {
-                        secondaryPct != null && secondaryPct > 89 && (primaryPct == null || primaryPct < 89) -> secondaryPct
-                        primaryPct != null -> primaryPct
-                        else -> secondaryPct ?: 0
                     }
                 }
             }

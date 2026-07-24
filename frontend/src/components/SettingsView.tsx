@@ -24,9 +24,16 @@ const defaultGlobalSettings: GlobalSettingsPayload = {
     userMessageBackgroundStyle: 'default',
     audioTranscription: { language: 'auto' },
     gitCommitGeneration: { enabled: false, adapterId: '', modelId: '', instructions: '' },
-    quotaWidgetEnabled: false
+    quotaWidgetEnabled: false,
+    executionTarget: 'local',
+    wslDistro: ''
   }
 };
+
+const executionTargetOptions: DropdownOption[] = [
+  { value: 'local', label: 'Local' },
+  { value: 'wsl', label: 'WSL' }
+];
 
 function SettingsLoadingSpinner({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -60,7 +67,9 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
         : 'default',
       audioTranscription: payload?.settings?.audioTranscription ?? { language: 'auto' },
       gitCommitGeneration: normalizeGitCommitGenerationSettings(payload?.settings?.gitCommitGeneration),
-      quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false
+      quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
+      executionTarget: payload?.settings?.executionTarget === 'wsl' ? 'wsl' : 'local',
+      wslDistro: payload?.settings?.wslDistro?.trim() ?? ''
     }
   };
 }
@@ -263,6 +272,18 @@ export function SettingsView() {
     ACPBridge.saveGlobalSettings(next);
   };
 
+  const handleExecutionTargetChange = (executionTarget: GlobalSettingsPayload['settings']['executionTarget']) => {
+    const next = { ...globalSettings.settings, executionTarget };
+    setGlobalSettings((prev) => ({ ...prev, settings: next }));
+    ACPBridge.saveGlobalSettings(next);
+  };
+
+  const handleWslDistroChange = (wslDistro: string) => {
+    const next = { ...globalSettings.settings, wslDistro };
+    setGlobalSettings((prev) => ({ ...prev, settings: next }));
+    ACPBridge.saveGlobalSettings(next);
+  };
+
   return (
     <div className='flex h-full flex-col overflow-hidden'>
       <div className='w-full flex-1 overflow-y-auto'>
@@ -315,6 +336,35 @@ export function SettingsView() {
                 })}
               </div>
             </SettingsCardShell>
+          </SettingsSection>
+
+          <SettingsSection title='AGENT EXECUTION'>
+            <SettingsSelectCard
+              title='Execution Environment'
+              description='Run agent CLIs on the local machine, or inside a WSL distribution'
+            >
+              <DropdownSelect
+                value={globalSettings.settings.executionTarget}
+                onChange={(value) => handleExecutionTargetChange(value === 'wsl' ? 'wsl' : 'local')}
+                options={executionTargetOptions}
+                className='w-[160px] max-w-[42vw]'
+              />
+            </SettingsSelectCard>
+
+            {globalSettings.settings.executionTarget === 'wsl' && (
+              <SettingsCardShell
+                title='WSL Distribution (optional)'
+                description='Leave blank to use whichever WSL distribution the current project is already open from. Only set this to double check you are on the distro you expect - it does not need the "WSL:" prefix shown in the project path.'
+              >
+                <input
+                  type='text'
+                  value={globalSettings.settings.wslDistro}
+                  onChange={(e) => handleWslDistroChange(e.target.value)}
+                  placeholder='e.g. Ubuntu-24.04 (optional)'
+                  className='w-[240px] max-w-[42vw] rounded-[4px] border border-border bg-background-secondary px-2 py-1 text-ide-regular text-foreground outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]'
+                />
+              </SettingsCardShell>
+            )}
           </SettingsSection>
 
           <SettingsSection title='NOTIFICATIONS'>

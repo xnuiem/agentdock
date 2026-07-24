@@ -312,6 +312,7 @@ internal fun AcpBridge.installAdapterQueries() {
 
                         replacingRuntime = true
                         val success = AcpAdapterPaths.installAdapterRuntime(
+                            project = service.project,
                             targetDir = targetDir,
                             adapterInfo = adapterInfo,
                             statusCallback = statusCallback,
@@ -444,6 +445,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         }
 
                         val success = AcpAdapterPaths.installAdapterRuntime(
+                            project = service.project,
                             targetDir = targetDir,
                             adapterInfo = adapterInfo,
                             statusCallback = statusCallback,
@@ -573,8 +575,6 @@ internal fun AcpBridge.installAdapterQueries() {
             scope.launch(Dispatchers.IO) {
                 val result = when (adapterId) {
                     "claude-code" -> AcpUsageDataFetcher.fetchClaudeUsageData()
-                    "codex" -> AcpUsageDataFetcher.fetchCodexUsageData()
-                    "github-copilot-cli" -> AcpUsageDataFetcher.fetchCopilotUsageData(adapterId)
                     else -> ""
                 }
                 if (result.isNotBlank()) {

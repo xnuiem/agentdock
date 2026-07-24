@@ -469,6 +469,12 @@ export function useAppController() {
     clearTabUnread(tabId);
   }, [clearTabUnread]);
 
+  const handleTabRenamed = useCallback((tabId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    setTabs(prev => prev.map(tab => (tab.id === tabId ? { ...tab, title: trimmed } : tab)));
+  }, []);
+
   return {
     tabs,
     activeTabId,
@@ -487,6 +493,7 @@ export function useAppController() {
     handleOpenHistory,
     openSingletonTab,
     handleUserMessageSent,
+    handleTabRenamed,
     handleAssistantActivity,
     handleAtBottomChange,
     handleCanMarkReadChange,

@@ -9,9 +9,7 @@ internal interface AdapterHistory {
 }
 
 internal object AdapterHistoryRegistry {
-    private val histories: Map<String, AdapterHistory> = listOf(
-        QoderCliHistory
-    ).associateBy { it.adapterId }
+    private val histories: Map<String, AdapterHistory> = emptyMap()
 
     fun get(adapterId: String): AdapterHistory? = histories[adapterId]
 

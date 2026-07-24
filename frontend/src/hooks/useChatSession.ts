@@ -99,7 +99,8 @@ export function useChatSession(
   inheritedAdapterNames: string[] = EMPTY_ADAPTER_NAMES,
   forkBase?: ForkConversationBase,
   onHandoffConsumed?: (handoffId: string) => void,
-  onUserMessageSent?: () => void
+  onUserMessageSent?: () => void,
+  onRenamed?: (title: string) => void
 ) {
   const [historyMessages, setHistoryMessages] = useState<Message[]>(initialMessages);
   const [liveMessages, setLiveMessages] = useState<Message[]>([]);
@@ -135,6 +136,7 @@ export function useChatSession(
   const recoveryInFlightRef = useRef(false);
   const initialUserMessageCountRef = useRef(initialMessages.filter((message) => message.role === 'user').length);
   const forkBaseRef = useRef<ForkConversationBase | undefined>(forkBase);
+  const renamedTitleRef = useRef<string | null>(null);
 
   const {
     applyBufferedChunks,
@@ -580,7 +582,8 @@ export function useChatSession(
     );
     if (promptCount <= 0) return;
 
-    const title = metadataTitleOverride?.trim() || titleFromFirstPrompt(messages);
+    const forcedTitle = renamedTitleRef.current?.trim();
+    const title = forcedTitle || metadataTitleOverride?.trim() || titleFromFirstPrompt(messages);
     const fingerprint = `${acpSessionId}|${selectedAgentId}|${promptCount}|${title || ''}|${inheritedAdapterNames.join(',')}`;
     if (lastMetadataFingerprintRef.current === fingerprint) return;
 
@@ -592,7 +595,7 @@ export function useChatSession(
       title,
       inheritedAdapterNames,
       touchUpdatedAt: touchUpdatedAtRef.current,
-      forceTitle: Boolean(metadataTitleOverride?.trim()),
+      forceTitle: Boolean(forcedTitle) || Boolean(metadataTitleOverride?.trim()),
     });
     window.setTimeout(() => {
       ACPBridge.requestHistoryList();
@@ -717,6 +720,20 @@ export function useChatSession(
     const text = inputValue.trim();
     if ((!text && attachments.length === 0) || isSending || status === 'prompting') return;
 
+    const renameMatch = /^\/rename\s+(.+)$/is.exec(text);
+    if (renameMatch) {
+      const newTitle = renameMatch[1].trim();
+      if (newTitle) {
+        renamedTitleRef.current = newTitle;
+        onRenamed?.(newTitle);
+        if (acpSessionId) {
+          ACPBridge.renameHistoryConversation(historySession?.projectPath, conversationId, newTitle);
+        }
+      }
+      setInputValue('');
+      return;
+    }
+
     const normalizedBlocks = normalizeOutgoingBlocks(buildPromptBlocks(inputValue, attachments));
     if (normalizedBlocks.length === 0) return;
     const outgoingBlocks = pendingHandoffRef.current
@@ -726,7 +743,7 @@ export function useChatSession(
     sendPreparedPrompt(normalizedBlocks, outgoingBlocks, plainTextFromBlocks(normalizedBlocks));
     setInputValue('');
     setAttachments([]);
-  }, [inputValue, attachments, isSending, status, sendPreparedPrompt]);
+  }, [inputValue, attachments, isSending, status, sendPreparedPrompt, onRenamed, acpSessionId, historySession, conversationId]);
 
   const handleQueueDraft = useCallback(() => {
     const text = inputValue.trim();

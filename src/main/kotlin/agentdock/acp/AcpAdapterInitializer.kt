@@ -33,9 +33,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
+import java.nio.file.Files
 import java.util.Collections
 import agentdock.BuildConfig
+import agentdock.eel.AcpEelEnvironment
 import agentdock.history.AgentDockHistoryService
+import com.intellij.platform.eel.provider.utils.EelPathUtils
 
 // Keep this aligned with the broader ACP startup budget.
 // A freshly updated adapter can need materially longer than 60s
@@ -239,7 +242,6 @@ internal suspend fun AcpClientService.initializeSharedProcessAtStartup(
         }
 
         val target = AcpAdapterPaths.getExecutionTarget()
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
 
         updateAdapterInitializationState(
             requestedAdapterName,
@@ -247,30 +249,35 @@ internal suspend fun AcpClientService.initializeSharedProcessAtStartup(
             detail = "Resolving launch command..."
         )
 
-        val command = AcpAdapterPaths.buildLaunchCommand(
-            adapterRootPath = adapterRoot,
-            adapterInfo = adapterInfo,
-            projectPath = project.basePath,
-            target = target
-        )
+        val (proc, adapterRootForRegistry) = if (target == AcpExecutionTarget.WSL) {
+            launchAdapterProcessOverWsl(adapterInfo, requestedAdapterName)
+        } else {
+            val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
+            val command = AcpAdapterPaths.buildLaunchCommand(
+                adapterRootPath = adapterRoot,
+                adapterInfo = adapterInfo,
+                projectPath = project.basePath,
+                target = target
+            )
 
-        updateAdapterInitializationState(
-            requestedAdapterName,
-            AcpClientService.AdapterInitializationStatus.Initializing,
-            detail = "Starting adapter process..."
-        )
+            updateAdapterInitializationState(
+                requestedAdapterName,
+                AcpClientService.AdapterInitializationStatus.Initializing,
+                detail = "Starting adapter process..."
+            )
 
-        var commandLine = com.intellij.execution.configurations.GeneralCommandLine(command)
-            .withWorkDirectory(resolveAdapterProcessWorkingDirectory(File(adapterRoot)))
-            .withEnvironment(AcpProcessEnvironment.baseEnvironment())
-            .withRedirectErrorStream(false)
-        AcpNodeRuntimeResolver.resolveAvailable()?.let { runtime ->
-            commandLine = AcpNodeRuntimeResolver.applyTo(commandLine, runtime)
+            var commandLine = com.intellij.execution.configurations.GeneralCommandLine(command)
+                .withWorkDirectory(resolveAdapterProcessWorkingDirectory(File(adapterRoot)))
+                .withEnvironment(AcpProcessEnvironment.baseEnvironment())
+                .withRedirectErrorStream(false)
+            AcpNodeRuntimeResolver.resolveAvailable()?.let { runtime ->
+                commandLine = AcpNodeRuntimeResolver.applyTo(commandLine, runtime)
+            }
+
+            withContext(Dispatchers.IO) { commandLine.createProcess() } to adapterRoot
         }
-
-        val proc = withContext(Dispatchers.IO) { commandLine.createProcess() }
         sharedProc.process = proc
-        AcpProcessRegistry.registerProcess(adapterInfo.id, adapterRoot, proc)
+        AcpProcessRegistry.registerProcess(adapterInfo.id, adapterRootForRegistry, proc)
         updateAdapterInitializationState(
             requestedAdapterName,
             AcpClientService.AdapterInitializationStatus.Initializing,
@@ -387,6 +394,81 @@ internal suspend fun AcpClientService.initializeSharedProcessAtStartup(
     }
 }
 
+/** Relative launch path for an adapter inside the WSL environment's own runtime dir. */
+internal fun wslRelativeLaunchPath(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
+    return when (adapterInfo.distribution.type) {
+        AcpAdapterConfig.DistributionType.ARCHIVE ->
+            platformBinaryForTarget(adapterInfo.distribution.binaryName, AcpExecutionTarget.WSL)
+                ?.takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("Missing WSL launch binary for adapter '${adapterInfo.id}'")
+        AcpAdapterConfig.DistributionType.NPM -> {
+            val launchBinary = platformBinaryForTarget(adapterInfo.launchBinary, AcpExecutionTarget.WSL).orEmpty().trim()
+            if (launchBinary.isNotEmpty()) {
+                launchBinary
+            } else {
+                val packageName = adapterInfo.distribution.packageName
+                    ?: throw IllegalStateException("Adapter '${adapterInfo.id}' missing distribution.packageName in configuration")
+                val launchPath = adapterInfo.launchPath.ifBlank { "dist/index.js" }
+                "node_modules/$packageName/$launchPath"
+            }
+        }
+    }
+}
+
+/**
+ * Launches the adapter process inside the project's WSL environment via EelApi.exec.
+ * Requires the project itself to be opened from the configured WSL distribution - see
+ * [agentdock.eel.AcpEelEnvironment.resolveWslEelApi]. Adapter installation into the WSL
+ * environment is not wired up yet, so this expects the launch file to already exist at
+ * the resolved runtime path.
+ */
+private suspend fun AcpClientService.launchAdapterProcessOverWsl(
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    requestedAdapterName: String
+): Pair<Process, String> {
+    val eel = AcpEelEnvironment.resolveWslEelApi(project)
+    val runtimeDir = AcpEelEnvironment.runtimeDir(eel)
+    val adapterRoot = AcpEelEnvironment.adapterDependenciesDir(eel, adapterInfo.id)
+    val launchFile = adapterRoot.resolve(wslRelativeLaunchPath(adapterInfo))
+
+    if (!Files.isRegularFile(launchFile)) {
+        throw IllegalStateException(
+            "Agent '${adapterInfo.id}' is not installed for WSL execution. Expected launch file at " +
+                "${AcpEelEnvironment.targetPathString(launchFile)} inside distribution '${eel.descriptor.name}'."
+        )
+    }
+
+    updateAdapterInitializationState(
+        requestedAdapterName,
+        AcpClientService.AdapterInitializationStatus.Initializing,
+        detail = "Starting adapter process..."
+    )
+
+    val launchFileTarget = AcpEelEnvironment.targetPathString(launchFile)
+    val name = launchFile.fileName.toString().lowercase()
+    val (executable, args) = if (name.endsWith(".js") || name.endsWith(".mjs")) {
+        val node = eel.exec.findExeFilesInPath("node").firstOrNull()
+            ?: throw IllegalStateException(
+                "No 'node' executable found in WSL distribution '${eel.descriptor.name}'. Install Node.js inside the distro."
+            )
+        node.toString() to (listOf(launchFileTarget) + adapterInfo.args)
+    } else {
+        launchFileTarget to adapterInfo.args
+    }
+
+    // baseEnvironment() is Windows-shaped (System.getenv() + host shell env) - handing that to
+    // a WSL process stomps its real PATH and breaks even the shebang interpreter lookup (node,
+    // env). Leave env empty so the WSL environment's own login/shell environment applies.
+    val proc = AcpEelEnvironment.spawn(
+        eel = eel,
+        executable = executable,
+        args = args,
+        workingDirectory = runtimeDir,
+        environment = emptyMap()
+    )
+    return proc to AcpEelEnvironment.targetPathString(adapterRoot)
+}
+
 private fun normalizeAdapterStartupException(error: Exception, startupOutput: List<String>): Exception {
     val haystacks = buildList {
         add(error.message.orEmpty())
@@ -402,14 +484,29 @@ private fun normalizeAdapterStartupException(error: Exception, startupOutput: Li
     return IllegalStateException("[AUTH_REQUIRED] Authentication required")
 }
 
+/**
+ * Probe-session working directory, in the string form the adapter process expects. LOCAL
+ * always uses the host-side probe dir; WSL must use a path native to that environment - the
+ * host-side dir isn't a valid absolute path from a WSL agent's point of view.
+ */
+private suspend fun AcpClientService.resolveProbeSessionCwd(): String {
+    val target = AcpAdapterPaths.getExecutionTarget()
+    if (target != AcpExecutionTarget.WSL) {
+        return resolveSessionCwd(AcpAdapterPaths.getProbeSessionDir().absolutePath)
+    }
+    val eel = AcpEelEnvironment.resolveWslEelApi(project)
+    val probeDir = AcpEelEnvironment.runtimeDir(eel).resolve("probe-sessions")
+    java.nio.file.Files.createDirectories(probeDir)
+    return AcpEelEnvironment.targetPathString(probeDir)
+}
+
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
     protocol: Protocol,
     client: Client,
     adapterInfo: AcpAdapterConfig.AdapterInfo
 ): AcpClientService.AdapterRuntimeMetadata {
-    val probeDir = AcpAdapterPaths.getProbeSessionDir()
-    val cwd = resolveSessionCwd(probeDir.absolutePath)
+    val cwd = resolveProbeSessionCwd()
     val result = protocol.newSessionRaw(cwd)
     val sessionId = result["sessionId"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
     if (sessionId.isEmpty()) {
@@ -438,7 +535,7 @@ private suspend fun AcpClientService.cleanupProbeSessions(
     client: Client,
     adapterInfo: AcpAdapterConfig.AdapterInfo
 ): Unit {
-    val cwd = resolveSessionCwd(AcpAdapterPaths.getProbeSessionDir().absolutePath)
+    val cwd = resolveProbeSessionCwd()
     val sessions = runCatching {
         client.listSessions(cwd = cwd).toList()
     }.getOrDefault(emptyList())
@@ -525,10 +622,15 @@ internal fun AcpClientService.applyAdapterRuntimePreferences(
 }
 
 internal fun AcpClientService.resolveAdapterProcessWorkingDirectory(adapterRoot: File): File {
+    // On IntelliJ Platform 2025.2+, File/Path operations are transparently routed through a
+    // project's Eel environment (e.g. WSL), so a WSL-opened project's basePath can pass
+    // exists()/isDirectory() here even though it isn't a real host path. LOCAL execution must
+    // stay strictly local - GeneralCommandLine below builds a Windows-native command, so handing
+    // it a WSL-routed working directory launches a Windows binary through a POSIX shell and fails.
     val projectBase = project.basePath
         ?.takeIf { it.isNotBlank() }
         ?.let { File(it) }
-        ?.takeIf { it.exists() && it.isDirectory }
+        ?.takeIf { it.exists() && it.isDirectory && EelPathUtils.isPathLocal(it.toPath()) }
     return projectBase ?: adapterRoot
 }
 

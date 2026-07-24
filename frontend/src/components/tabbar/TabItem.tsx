@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { AgentOption, ChatTab } from '../../types/chat';
 import { getTabIcon } from './TabIcons';
@@ -16,6 +17,7 @@ interface TabItemProps {
   onPointerDown: (id: string, event: React.PointerEvent<HTMLDivElement>) => void;
   shouldSuppressClick: (id: string) => boolean;
   onCloseTab: (id: string) => void;
+  onRenameTab: (id: string, newTitle: string) => void;
   onFocusTab: (id: string) => void;
   onBlurTab: (id: string) => void;
   dropIndicator: 'before' | 'after' | null;
@@ -35,10 +37,40 @@ export function TabItem({
   onPointerDown,
   shouldSuppressClick,
   onCloseTab,
+  onRenameTab,
   onFocusTab,
   onBlurTab,
   dropIndicator
 }: TabItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(tab.title);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }
+  }, [isEditing]);
+
+  const startEditing = () => {
+    if (tab.type !== 'chat') return;
+    setEditValue(tab.title);
+    setIsEditing(true);
+  };
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== tab.title) {
+      onRenameTab(tab.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setEditValue(tab.title);
+    setIsEditing(false);
+  };
   const activeClassName = isActive
     ? isIslandsTheme
       ? 'text-foreground before:absolute before:inset-[3px_3px] before:rounded-[6px] before:bg-background before:[filter:var(--ide-surface-active-filter)] before:shadow-[inset_0_0_0_1px_var(--ide-Button-startBorderColor)]'
@@ -76,13 +108,18 @@ export function TabItem({
         role="tab"
         aria-selected={isActive}
         onClick={(event) => {
-          if (shouldSuppressClick(tab.id)) {
+          if (isEditing || shouldSuppressClick(tab.id)) {
             event.preventDefault();
             return;
           }
           onSelectTab(tab.id);
         }}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          startEditing();
+        }}
         onKeyDown={(event) => {
+          if (isEditing) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onSelectTab(tab.id);
@@ -97,7 +134,39 @@ export function TabItem({
           {getTabIcon(tab, agents)}
         </div>
         <div className={`min-w-0 flex-1 overflow-hidden ${titleClassName}`}>
-          <div className={`truncate text-ide-small relative top-[1px] ${hasProcessing ? 'tab-shimmer-text' : ''}`}>{tab.title}</div>
+          {isEditing ? (
+            <input
+              ref={editInputRef}
+              value={editValue}
+              onChange={(event) => setEditValue(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  commitEdit();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  cancelEdit();
+                }
+              }}
+              onBlur={commitEdit}
+              className="w-full truncate rounded-[2px] bg-background-secondary text-ide-small relative top-[1px] outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+            />
+          ) : (
+            <div
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                startEditing();
+              }}
+              className={`truncate text-ide-small relative top-[1px] ${hasProcessing ? 'tab-shimmer-text' : ''}`}
+            >
+              {tab.title}
+            </div>
+          )}
         </div>
       </button>
       {hasWarning ? (

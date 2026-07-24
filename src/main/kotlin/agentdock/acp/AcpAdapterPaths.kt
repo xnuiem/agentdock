@@ -1,5 +1,7 @@
 package agentdock.acp
 
+import agentdock.eel.AcpEelEnvironment
+import com.intellij.openapi.project.Project
 import java.io.File
 
 /**
@@ -51,6 +53,7 @@ object AcpAdapterPaths {
         target: AcpExecutionTarget = currentTarget()
     ): String {
         val adapterInfo = getAdapterInfo(adapterName)
+        if (target == AcpExecutionTarget.WSL) return wslDownloadPathDisplay(adapterInfo)
         return resolveDownloadPath(adapterInfo, target)
     }
 
@@ -59,6 +62,7 @@ object AcpAdapterPaths {
         target: AcpExecutionTarget = currentTarget()
     ): String? {
         val adapterInfo = getAdapterInfo(adapterName)
+        if (target == AcpExecutionTarget.WSL) return wslInstalledVersion(adapterInfo)
         val runtimeDir = File(getDependenciesDir(), adapterInfo.id)
         return installedVersionFromRuntimeDir(runtimeDir, adapterInfo)
     }
@@ -68,6 +72,7 @@ object AcpAdapterPaths {
         target: AcpExecutionTarget = currentTarget()
     ): Boolean {
         val adapterInfo = getAdapterInfo(adapterName)
+        if (target == AcpExecutionTarget.WSL) return isWslAdapterDownloaded(adapterInfo)
         val runtimeDir = File(getDependenciesDir(), adapterInfo.id)
         return runtimeDir.isDirectory &&
             when (adapterInfo.distribution.type) {
@@ -81,6 +86,7 @@ object AcpAdapterPaths {
 
     internal fun deleteAdapter(adapterName: String? = null, target: AcpExecutionTarget = currentTarget()): Boolean {
         val adapterInfo = getAdapterInfo(adapterName)
+        if (target == AcpExecutionTarget.WSL) return deleteWslAdapterRuntime(adapterInfo)
         return deleteLocalAdapterRuntime(File(getDependenciesDir(), adapterInfo.id), adapterInfo.id, target)
     }
 
@@ -110,7 +116,8 @@ object AcpAdapterPaths {
         }
     }
 
-    internal fun installAdapterRuntime(
+    internal suspend fun installAdapterRuntime(
+        project: Project,
         targetDir: File,
         adapterInfo: AcpAdapterConfig.AdapterInfo,
         statusCallback: ((String) -> Unit)? = null,
@@ -124,6 +131,13 @@ object AcpAdapterPaths {
         } ?: adapterInfo
         val resolvedAdapterInfo = resolveInstallAdapterInfo(baseAdapterInfo, statusCallback) ?: return false
         cancellation?.throwIfCancelled()
+
+        if (target == AcpExecutionTarget.WSL) {
+            val success = installNpmAdapterOverWsl(project, resolvedAdapterInfo, statusCallback, cancellation, versionOverride)
+            cancellation?.throwIfCancelled()
+            return success && isDownloaded(resolvedAdapterInfo.id, target)
+        }
+
         prepareAdapterTargetDir(targetDir)
         val success = when (resolvedAdapterInfo.distribution.type) {
             AcpAdapterConfig.DistributionType.ARCHIVE ->

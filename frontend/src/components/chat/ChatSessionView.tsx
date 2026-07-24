@@ -34,6 +34,7 @@ interface ChatSessionProps {
   forkBase?: ForkConversationBase;
   isActive?: boolean;
   onUserMessageSent?: () => void;
+  onRenamed?: (title: string) => void;
   onAssistantActivity?: () => void;
   onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
@@ -57,6 +58,7 @@ export default function ChatSessionView({
   forkBase,
   isActive = false,
   onUserMessageSent,
+  onRenamed,
   onAssistantActivity,
   onAtBottomChange,
   onCanMarkReadChange,
@@ -114,7 +116,8 @@ export default function ChatSessionView({
     inheritedAdapterNames,
     forkBase,
     onHandoffConsumed,
-    onUserMessageSent
+    onUserMessageSent,
+    onRenamed
   );
 
   const {

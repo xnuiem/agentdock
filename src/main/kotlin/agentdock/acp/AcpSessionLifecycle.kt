@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import agentdock.eel.AcpEelEnvironment
 import agentdock.history.SessionMeta
 
 // Max time to wait for the agent process to start and respond to ACP initialize.
@@ -24,8 +25,17 @@ internal fun AcpClientService.processKey(adapterName: String): String {
 internal fun AcpClientService.ensureExecutionTargetCurrent() {
 }
 
+/**
+ * Converts a host-side path string (e.g. project.basePath) to the form the agent process
+ * expects. For a WSL project, project.basePath is IntelliJ's UNC display form
+ * (//wsl.localhost/<distro>/...) - that prefix doesn't exist inside the WSL filesystem itself,
+ * so it must be converted to the environment-native path (/opt/mono) before being sent as cwd.
+ */
 internal fun AcpClientService.resolveSessionCwd(path: String): String {
-    return path
+    if (AcpAdapterPaths.getExecutionTarget() != AcpExecutionTarget.WSL) return path
+    return runCatching {
+        AcpEelEnvironment.targetPathString(java.nio.file.Path.of(path))
+    }.getOrDefault(path)
 }
 
 @Suppress("OPT_IN_USAGE")

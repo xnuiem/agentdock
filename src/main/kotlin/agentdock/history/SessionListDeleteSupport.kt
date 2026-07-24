@@ -13,10 +13,6 @@ internal object SessionListDeleteSupport {
     fun resolveSourceFilePath(projectPath: String, adapterName: String, sessionId: String): String {
         return when (adapterName) {
             "claude-code" -> resolveClaudeSourceFilePath(projectPath, sessionId)
-            "codex" -> resolveCodexSourceFilePath(projectPath, sessionId)
-            "github-copilot-cli" -> resolveGithubCopilotSourceFilePath(projectPath, sessionId)
-            "cursor-cli" -> resolveCursorSourceFilePath(projectPath, sessionId)
-            "qoder" -> QoderCliHistory.resolveSourceFilePath(projectPath, sessionId)
             else -> ""
         }
     }
@@ -24,12 +20,8 @@ internal object SessionListDeleteSupport {
     fun deleteSession(projectPath: String, adapterName: String, sessionId: String, sourceFilePath: String?): Boolean {
         return when (adapterName) {
             "claude-code" -> deleteClaudeSession(projectPath, sessionId, sourceFilePath)
-            "codex" -> deleteCodexSession(sourceFilePath)
-            "cursor-cli" -> deleteCursorSession(sourceFilePath)
-            "github-copilot-cli" -> deleteGithubCopilotSession(sourceFilePath)
             "kilo" -> runAgentHistoryCliCommand("kilo", projectPath, listOf("session", "delete", sessionId)) != null
             "opencode" -> runAgentHistoryCliCommand("opencode", projectPath, listOf("session", "delete", sessionId)) != null
-            "qoder" -> QoderCliHistory.deleteQoderSession(sourceFilePath)
             else -> false
         }
     }
@@ -82,91 +74,4 @@ internal object SessionListDeleteSupport {
         }.getOrDefault(true)
     }
 
-    private fun resolveCodexSourceFilePath(projectPath: String, sessionId: String): String {
-        val expectedProjectPath = historyComparablePath(projectPath)
-        val files = findMatchingHistoryFiles(resolveHistoryPathTemplate("~/.codex/sessions/*/*/*/*.jsonl", projectPath))
-        return files.firstOrNull { file ->
-            var matchedSessionId: String? = null
-            var sessionProjectPath: String? = null
-            runCatching {
-                file.useLines { lines ->
-                    for (line in lines.take(200)) {
-                        if (!line.trimStart().startsWith("{")) continue
-                        val element = historyJson.parseToJsonElement(line)
-                        if (element.stringAtPath("type") != "session_meta") continue
-                        matchedSessionId = element.stringAtPath("payload.id") ?: file.nameWithoutExtension
-                        sessionProjectPath = historyComparablePath(element.stringAtPath("payload.cwd"))
-                        break
-                    }
-                }
-            }
-            matchedSessionId == sessionId &&
-                !sessionProjectPath.isNullOrBlank() &&
-                (expectedProjectPath.isBlank() || sessionProjectPath == expectedProjectPath)
-        }?.absolutePath.orEmpty()
-    }
-
-    private fun deleteCodexSession(sourceFilePath: String?): Boolean {
-        val sourcePath = sourceFilePath?.takeIf { it.isNotBlank() } ?: return false
-        return deleteHistoryFileIfExists(File(sourcePath))
-    }
-
-    private fun resolveGithubCopilotSourceFilePath(projectPath: String, sessionId: String): String {
-        val expectedProjectPath = historyComparablePath(projectPath)
-        val files = findMatchingHistoryFiles(resolveHistoryPathTemplate("~/.copilot/session-state/*/events.jsonl", projectPath))
-        return files.firstOrNull { file ->
-            val sessionDir = file.parentFile ?: return@firstOrNull false
-            val workspaceFile = File(sessionDir, "workspace.yaml")
-            val workspace = parseSimpleYamlMap(workspaceFile)
-            var matchedSessionId = workspace["id"]?.trim().orEmpty().ifBlank { sessionDir.name }
-            val workspaceCwd = historyComparablePath(workspace["cwd"])
-            var eventCwd = ""
-            var gitRoot = ""
-
-            runCatching {
-                file.useLines { lines ->
-                    for (line in lines.take(200)) {
-                        if (!line.trimStart().startsWith("{")) continue
-                        val root = historyJson.parseToJsonElement(line).jsonObject
-                        val type = root.stringOrNull("type")?.lowercase()
-                        val data = root["data"]?.jsonObject
-                        if (type == "session.start" && data != null) {
-                            matchedSessionId = data.stringOrNull("sessionId")?.trim().orEmpty().ifBlank { matchedSessionId }
-                            val context = data["context"]?.jsonObject
-                            eventCwd = historyComparablePath(context?.stringOrNull("cwd"))
-                            gitRoot = historyComparablePath(context?.stringOrNull("gitRoot"))
-                            break
-                        }
-                    }
-                }
-            }
-
-            val matchesProject = expectedProjectPath.isBlank() || listOf(workspaceCwd, eventCwd, gitRoot)
-                .filter { it.isNotBlank() }
-                .any { it == expectedProjectPath }
-            matchedSessionId == sessionId && matchesProject
-        }?.absolutePath.orEmpty()
-    }
-
-    private fun deleteGithubCopilotSession(sourceFilePath: String?): Boolean {
-        val sessionDir = sourceFilePath?.takeIf { it.isNotBlank() }?.let { File(it).parentFile } ?: return false
-        return deleteHistoryDirectoryIfExists(sessionDir)
-    }
-
-    private fun resolveCursorSourceFilePath(projectPath: String, sessionId: String): String {
-        val files = findMatchingHistoryFiles(resolveHistoryPathTemplate("~/.cursor/chats/{projectHashMd5}/*/store.db", projectPath))
-        val chatFile = files.firstOrNull { file ->
-            val sessionDir = file.parentFile ?: return@firstOrNull false
-            sessionDir.name == sessionId
-        }
-        if (chatFile != null) return chatFile.absolutePath
-
-        val acpSessionDb = File(System.getProperty("user.home"), ".cursor/acp-sessions/$sessionId/store.db")
-        return if (acpSessionDb.exists()) acpSessionDb.absolutePath else ""
-    }
-
-    private fun deleteCursorSession(sourceFilePath: String?): Boolean {
-        val sessionDir = sourceFilePath?.takeIf { it.isNotBlank() }?.let { File(it).parentFile } ?: return false
-        return deleteHistoryDirectoryIfExists(sessionDir)
-    }
 }

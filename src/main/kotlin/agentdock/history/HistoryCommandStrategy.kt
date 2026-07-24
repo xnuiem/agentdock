@@ -3,6 +3,7 @@ package agentdock.history
 import agentdock.acp.AcpExecutionTarget
 import agentdock.acp.buildAdapterCliCommandParts
 import agentdock.acp.isWindowsLocalTarget
+import com.intellij.platform.eel.provider.utils.EelPathUtils
 import java.io.File
 
 internal fun runAgentHistoryCliCommand(
@@ -11,6 +12,10 @@ internal fun runAgentHistoryCliCommand(
     args: List<String>
 ): String? {
     val (_, commandParts) = buildAdapterCliCommandParts(adapterId, args) ?: return null
+    // This launches a host-local process, so a WSL-routed projectPath (from a WSL-opened
+    // project) must not be used as its working directory - see AcpAdapterInitializer for the
+    // same guard on the primary launch path.
+    val workingDir = File(projectPath).takeIf { EelPathUtils.isPathLocal(it.toPath()) } ?: return null
     return runCatching {
         val localCommandParts = if (
             isWindowsLocalTarget(AcpExecutionTarget.LOCAL) &&
@@ -21,7 +26,7 @@ internal fun runAgentHistoryCliCommand(
             commandParts
         }
         val process = ProcessBuilder(localCommandParts)
-            .directory(File(projectPath))
+            .directory(workingDir)
             .redirectErrorStream(true)
             .start()
         val output = process.inputStream.bufferedReader().use { it.readText() }

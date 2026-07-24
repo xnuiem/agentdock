@@ -136,11 +136,8 @@ class AgentDockQuotaWidget(project: Project) : CustomStatusBarWidget {
     }
 
     private fun loadAdapterIcon(adapterId: String): Icon? {
-        val isDark = !JBColor.isBright()
         val path = when (adapterId) {
             "claude-code" -> "/icons/claude.svg"
-            "codex" -> if (isDark) "/icons/codex-dark.svg" else "/icons/codex-light.svg"
-            "github-copilot-cli" -> if (isDark) "/icons/copilot-dark.svg" else "/icons/copilot-light.svg"
             else -> "/icons/agent_dock_toolwindow.svg"
         }
         return try {
