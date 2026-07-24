@@ -16,7 +16,11 @@ object AcpAdapterConfig {
     data class ModeInfo(
         val id: String,
         val name: String,
-        val description: String? = null
+        val description: String? = null,
+        // The model this agent/mode is configured to run (opencode reads it from agent frontmatter);
+        // null when the adapter/agent declares no model. Surfaced so the UI can move the model
+        // selection to match the chosen agent, which the ACP protocol never does on its own.
+        val modelId: String? = null
     )
 
     @Serializable

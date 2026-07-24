@@ -54,7 +54,7 @@ private fun AcpAdapterConfig.ModeInfo.toReasoningEffortPayload(): AdapterReasoni
 }
 
 private fun AcpAdapterConfig.ModeInfo.toModePayload(): AdapterModePayload {
-    return AdapterModePayload(id, name, description.orEmpty())
+    return AdapterModePayload(id, name, description.orEmpty(), modelId)
 }
 
 internal fun AcpBridge.setDownloadProbeState(
@@ -206,9 +206,7 @@ private fun AcpBridge.buildAdapterPayload(
             AdapterModelPayload(it.modelId, it.name, it.description.orEmpty())
         },
         currentModeId = runtimeMetadata.currentModeId ?: "",
-        availableModes = runtimeMetadata.availableModes.map {
-            AdapterModePayload(it.id, it.name, it.description.orEmpty())
-        },
+        availableModes = runtimeMetadata.availableModes.map { it.toModePayload() },
         availableModesByModel = runtimeMetadata.availableModesByModel.mapValues { (_, modes) ->
             modes.map { it.toModePayload() }
         },

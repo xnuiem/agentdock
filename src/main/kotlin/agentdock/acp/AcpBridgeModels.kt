@@ -17,7 +17,8 @@ internal data class AdapterModelPayload(
 internal data class AdapterModePayload(
     val id: String,
     val name: String,
-    val description: String
+    val description: String,
+    val modelId: String? = null
 )
 
 @Serializable

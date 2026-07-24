@@ -194,6 +194,19 @@ export function useAgentRuntimeOptions({
     setSelectedModeByAgent((prev) => (
       selectedAgentId ? { ...prev, [selectedAgentId]: modeId } : prev
     ));
+    // opencode agents declare their own model in frontmatter, which the ACP protocol never applies
+    // as the session model. The backend surfaces it as ModeOption.modelId, so when the user picks an
+    // agent we move the model selection to that agent's model (if it's a known/available model). A
+    // later manual model change still wins - this only fires on the agent switch itself.
+    if (!selectedAgentId) return;
+    const selectedMode = availableModes.find((mode) => mode.id === modeId);
+    const modeModelId = selectedMode?.modelId;
+    if (!modeModelId) return;
+    const modelIsAvailable = availableModels.some((model) => model.modelId === modeModelId);
+    if (!modelIsAvailable) return;
+    setSelectedModelByAgent((prev) => (
+      prev[selectedAgentId] === modeModelId ? prev : { ...prev, [selectedAgentId]: modeModelId }
+    ));
   };
 
   const handleReasoningEffortChange = (reasoningEffortId: string) => {

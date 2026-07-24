@@ -48,10 +48,16 @@ private const val ADAPTER_INITIALIZATION_TIMEOUT_MS = 300_000L
 internal fun AcpClientService.initializeDownloadedAdaptersInBackground() {
     if (!startupInitializationStarted.compareAndSet(false, true)) return
 
-    AcpAdapterConfig.getAllAdapters().values.forEach { adapterInfo ->
-        val downloaded = runCatching { AcpAdapterPaths.isDownloaded(adapterInfo.id) }.getOrDefault(false)
-        if (!downloaded) return@forEach
-        initializeAdapterInBackground(adapterInfo.id)
+    // Callers include AgentDockToolWindowFactory's EDT invokeLater block, and isDownloaded's
+    // WSL path does a blocking Eel bridge call that's forbidden on EDT (throws, silently
+    // swallowed below as "not downloaded" without this hop) - always run off EDT so whichever
+    // caller wins the startupInitializationStarted race still does real work.
+    CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        AcpAdapterConfig.getAllAdapters().values.forEach { adapterInfo ->
+            val downloaded = runCatching { AcpAdapterPaths.isDownloaded(adapterInfo.id) }.getOrDefault(false)
+            if (!downloaded) return@forEach
+            initializeAdapterInBackground(adapterInfo.id)
+        }
     }
 }
 
@@ -496,20 +502,16 @@ private fun normalizeAdapterStartupException(error: Exception, startupOutput: Li
 }
 
 /**
- * Probe-session working directory, in the string form the adapter process expects. LOCAL
- * always uses the host-side probe dir; WSL must use a path native to that environment - the
- * host-side dir isn't a valid absolute path from a WSL agent's point of view.
+ * Working directory for the throwaway metadata-probe session, in the string form the adapter
+ * process expects. This MUST be the project directory (converted to the target environment's
+ * native path via resolveSessionCwd): opencode/kilo enumerate project-local custom agents
+ * (.opencode/agents, .kilo/...) from the session's cwd, so a synthetic isolated probe dir would
+ * surface only the agent's built-in defaults in the model/mode/agent picker. The single probe
+ * session created with this cwd is deleted immediately afterward (see cleanupProbeSession) so it
+ * never lingers in the project's real session history.
  */
-private suspend fun AcpClientService.resolveProbeSessionCwd(): String {
-    val target = AcpAdapterPaths.getExecutionTarget()
-    if (target != AcpExecutionTarget.WSL) {
-        return resolveSessionCwd(AcpAdapterPaths.getProbeSessionDir().absolutePath)
-    }
-    val eel = AcpEelEnvironment.resolveWslEelApi(project)
-    val probeDir = AcpEelEnvironment.runtimeDir(eel).resolve("probe-sessions")
-    java.nio.file.Files.createDirectories(probeDir)
-    return AcpEelEnvironment.targetPathString(probeDir)
-}
+private fun AcpClientService.resolveProbeSessionCwd(): String =
+    resolveSessionCwd(project.basePath ?: System.getProperty("user.dir"))
 
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
@@ -527,42 +529,64 @@ internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
         val configMetadata = runtimeMetadataFromSessionResponseJson(result, adapterInfo)
         val adapterVersion = AcpConfigOptionsCache.adapterVersion(adapterInfo)
         val existingCache = AcpConfigOptionsCache.readValid(adapterInfo)
-        val cached = protocol.collectConfigOptionsCatalog(
+        val rawCached = protocol.collectConfigOptionsCatalog(
             sessionId = sessionId,
             adapterInfo = adapterInfo,
             adapterVersion = adapterVersion,
             initialMetadata = configMetadata,
             existingCache = existingCache
         )
+        val cached = enrichModeModels(rawCached, adapterInfo)
         AcpConfigOptionsCache.write(cached)
         return cached.toRuntimeMetadata(adapterInfo)
     } finally {
-        cleanupProbeSessions(client, adapterInfo)
+        cleanupProbeSession(adapterInfo, cwd, sessionId)
     }
 }
 
-@OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
-private suspend fun AcpClientService.cleanupProbeSessions(
-    client: Client,
+/**
+ * Fills in each mode's declared model (from the agent's frontmatter) so the UI can move the model
+ * selection to match a chosen agent. Reads the frontmatter once per distinct mode here (at metadata
+ * build / adapter init), and the result is cached alongside the rest of the config options. No-op for
+ * adapters/agents that declare no model - those modes keep modelId = null and leave the model as-is.
+ */
+private fun AcpClientService.enrichModeModels(
+    cached: CachedAdapterConfigOptions,
     adapterInfo: AcpAdapterConfig.AdapterInfo
-): Unit {
-    val cwd = resolveProbeSessionCwd()
-    val sessions = runCatching {
-        client.listSessions(cwd = cwd).toList()
-    }.getOrDefault(emptyList())
+): CachedAdapterConfigOptions {
+    val modelByMode = HashMap<String, String?>()
+    fun modelFor(modeId: String): String? =
+        modelByMode.getOrPut(modeId) { agentDeclaredModelId(adapterInfo.id, modeId) }
 
-    sessions.forEach { session ->
-        val sessionId = session.sessionId.value.trim()
-        if (sessionId.isBlank()) return@forEach
-        runCatching {
-            AgentDockHistoryService.deleteSessionImmediately(
-                projectPath = cwd,
-                sessionId = sessionId,
-                adapterName = adapterInfo.id,
-                waitTimeoutMillis = 1_000L,
-                pollIntervalMillis = 100L
-            )
-        }
+    val enrichedModels = cached.models.map { model ->
+        model.copy(
+            modes = model.modes.map { mode ->
+                if (mode.modelId != null) mode else mode.copy(modelId = modelFor(mode.id))
+            }
+        )
+    }
+    return cached.copy(models = enrichedModels)
+}
+
+@OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
+private suspend fun AcpClientService.cleanupProbeSession(
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    cwd: String,
+    sessionId: String
+): Unit {
+    // The probe now runs in the real project directory so custom agents are discovered, which
+    // means we must delete ONLY the throwaway session this probe created - never list-and-delete
+    // every session at the cwd, or we would wipe the user's real project sessions.
+    val trimmed = sessionId.trim()
+    if (trimmed.isBlank()) return
+    runCatching {
+        AgentDockHistoryService.deleteSessionImmediately(
+            projectPath = cwd,
+            sessionId = trimmed,
+            adapterName = adapterInfo.id,
+            waitTimeoutMillis = 1_000L,
+            pollIntervalMillis = 100L
+        )
     }
 }
 

@@ -94,6 +94,9 @@ export interface ModeOption {
   id: string;
   name: string;
   description?: string;
+  // The model this agent/mode runs (opencode reads it from agent frontmatter). When present,
+  // selecting this mode moves the model selection to match. Absent when the agent declares no model.
+  modelId?: string;
 }
 
 export interface ReasoningEffortOption {

@@ -248,6 +248,40 @@ private suspend fun AcpClientService.applyReadySessionModePreference(
     }.getOrDefault(false)
 }
 
+/**
+ * Reads a custom agent's declared model from its on-disk frontmatter (opencode layout). opencode
+ * agents declare their own `model:`, but the ACP protocol never reports it as the session's current
+ * model (verified against opencode 1.18.4), so we surface it in the mode metadata and let the UI
+ * apply it when the agent is selected. Returns null for adapters/agents without a declared model.
+ */
+internal fun AcpClientService.agentDeclaredModelId(adapterName: String, modeId: String): String? {
+    // Only opencode ships per-agent frontmatter files that carry a model; kilo's modes are built-in.
+    if (adapterName != "opencode") return null
+    val base = project.basePath?.takeIf { it.isNotBlank() } ?: return null
+    val relativeCandidates = listOf(
+        ".opencode/agents/$modeId.md",
+        ".opencode/agent/$modeId.md" // older singular layout
+    )
+    for (relative in relativeCandidates) {
+        val path = runCatching { java.nio.file.Path.of(base, relative) }.getOrNull() ?: continue
+        if (!runCatching { java.nio.file.Files.isRegularFile(path) }.getOrDefault(false)) continue
+        val text = runCatching { java.nio.file.Files.readString(path) }.getOrNull() ?: continue
+        parseAgentFrontmatterModel(text)?.let { return it }
+    }
+    return null
+}
+
+/** Extracts `model:` from a leading `--- ... ---` YAML frontmatter block. */
+private fun parseAgentFrontmatterModel(text: String): String? {
+    val trimmed = text.trimStart()
+    if (!trimmed.startsWith("---")) return null
+    val closingIndex = trimmed.indexOf("\n---", startIndex = 3)
+    if (closingIndex < 0) return null
+    val frontmatter = trimmed.substring(3, closingIndex)
+    val modeLine = Regex("^\\s*model\\s*:\\s*(.+?)\\s*$", RegexOption.MULTILINE).find(frontmatter) ?: return null
+    return modeLine.groupValues[1].trim().trim('"', '\'').takeIf { it.isNotBlank() }
+}
+
 private suspend fun AcpClientService.applyReadySessionReasoningEffortPreference(
     context: AcpClientService.AgentContext,
     adapterName: String,

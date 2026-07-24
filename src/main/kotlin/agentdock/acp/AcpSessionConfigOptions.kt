@@ -203,7 +203,12 @@ internal suspend fun Protocol.collectConfigOptionsCatalog(
                 modelId = modelId,
                 name = cachedModel?.name ?: modelId,
                 description = cachedModel?.description,
-                modes = cachedModel?.modes ?: initialMetadata.availableModes,
+                // Modes are the agent list (e.g. opencode's project-local custom agents) and are
+                // project-scoped + model-independent for every supported adapter. They come free in
+                // each fresh session/new response, so the fresh value MUST win over the version-keyed
+                // global cache - otherwise a cache written from a different project (or an earlier
+                // wrong-cwd probe) keeps serving stale agents forever.
+                modes = initialMetadata.availableModes.ifEmpty { cachedModel?.modes.orEmpty() },
                 efforts = cachedModel?.efforts ?: initialMetadata.availableReasoningEfforts
             )
         }
@@ -230,7 +235,11 @@ internal suspend fun Protocol.collectConfigOptionsCatalog(
                 modelId = model.modelId,
                 name = model.name,
                 description = model.description,
-                modes = cachedModel?.modes ?: metadata.availableModes,
+                // Prefer the fresh session's mode list over the version-keyed cache: modes are the
+                // project-scoped, model-independent agent list and come free in the session response,
+                // so caching them across projects/cwds is what hid the custom agents. Efforts stay
+                // cache-first since they're genuinely per-model and expensive to enumerate.
+                modes = initialMetadata.availableModes.ifEmpty { cachedModel?.modes ?: metadata.availableModes },
                 efforts = cachedModel?.efforts ?: metadata.availableReasoningEfforts
             )
             modeConfigId = modeConfigId ?: metadata.modeConfigId
