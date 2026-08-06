@@ -115,7 +115,8 @@ internal fun AcpBridge.installConversationQueries() {
                                 adapterName,
                                 modelId,
                                 preferredModeId = modeId,
-                                preferredReasoningEffortId = reasoningEffortId
+                                preferredReasoningEffortId = reasoningEffortId,
+                                rootPath = parsed.rootPath
                             )
                         }
                         pushAdapters()
@@ -190,7 +191,8 @@ internal fun AcpBridge.installConversationQueries() {
                             adapterName = parsed.adapterId,
                             preferredModelId = parsed.modelId,
                             preferredModeId = parsed.modeId,
-                            preferredReasoningEffortId = parsed.reasoningEffortId
+                            preferredReasoningEffortId = parsed.reasoningEffortId,
+                            rootPath = parsed.rootPath
                         )
                         pushStatus(chatId, "prompting")
                         service.prompt(chatId, blocks).collect { event ->

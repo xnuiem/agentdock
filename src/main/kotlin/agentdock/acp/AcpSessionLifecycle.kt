@@ -13,10 +13,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import agentdock.eel.AcpEelEnvironment
 import agentdock.history.SessionMeta
+import com.intellij.openapi.diagnostic.Logger
 
 // Max time to wait for the agent process to start and respond to ACP initialize.
 // The retry loop in initializeSharedProcessAtStartup can take up to this long for slow agents.
 private const val PROCESS_STARTUP_TIMEOUT_MS = 300_000L
+
+private val SESSION_LOG = Logger.getInstance("AgentDock.SessionLifecycle")
 
 internal fun AcpClientService.processKey(adapterName: String): String {
     return adapterName
@@ -32,10 +35,18 @@ internal fun AcpClientService.ensureExecutionTargetCurrent() {
  * so it must be converted to the environment-native path (/opt/mono) before being sent as cwd.
  */
 internal fun AcpClientService.resolveSessionCwd(path: String): String {
-    if (AcpAdapterPaths.getExecutionTarget() != AcpExecutionTarget.WSL) return path
-    return runCatching {
+    if (AcpAdapterPaths.getExecutionTarget() != AcpExecutionTarget.WSL) {
+        SESSION_LOG.info("[AgentDock] cwd (local) = '$path'")
+        return path
+    }
+    val resolved = runCatching {
         AcpEelEnvironment.targetPathString(java.nio.file.Path.of(path))
-    }.getOrDefault(path)
+    }.getOrElse { e ->
+        SESSION_LOG.warn("[AgentDock] cwd WSL-convert FAILED for '$path'; falling back to raw path", e)
+        path
+    }
+    SESSION_LOG.info("[AgentDock] cwd (wsl) '$path' -> '$resolved'")
+    return resolved
 }
 
 @Suppress("OPT_IN_USAGE")
@@ -46,10 +57,14 @@ internal suspend fun AcpClientService.startAgent(
     resumeSessionId: String? = null,
     forceRestart: Boolean = false,
     preferredModeId: String? = null,
-    preferredReasoningEffortId: String? = null
+    preferredReasoningEffortId: String? = null,
+    rootPath: String? = null
 ) {
     ensureExecutionTargetCurrent()
     val context = sessions.computeIfAbsent(chatId) { createAgentContext(chatId) }
+    // Register the workspace root the frontend scoped this conversation to (host display form).
+    // Keep the last-known value if this call omits it, so restarts don't lose the scoping.
+    rootPath?.takeIf { it.isNotBlank() }?.let { context.cwdOverride = it }
 
     withContext(Dispatchers.IO) {
         context.lifecycleMutex.withLock {
@@ -94,7 +109,9 @@ internal suspend fun AcpClientService.startAgent(
                 context.stop()
             }
 
-            if (!AcpAdapterPaths.isDownloaded(requestedAdapterName)) {
+            val downloaded = AcpAdapterPaths.isDownloaded(requestedAdapterName)
+            SESSION_LOG.info("[AgentDock] startAgent begin chat=$chatId adapter=$requestedAdapterName downloaded=$downloaded")
+            if (!downloaded) {
                 context.statusRef.set(AcpClientService.Status.Error)
                 throw IllegalStateException("Agent '$requestedAdapterName' is not downloaded")
             }
@@ -107,16 +124,18 @@ internal suspend fun AcpClientService.startAgent(
                 }
                 context.sharedProcess = sharedProc
 
+                SESSION_LOG.info("[AgentDock] ensureSharedProcessStarted... adapter=$requestedAdapterName")
                 withTimeout(PROCESS_STARTUP_TIMEOUT_MS) {
                     ensureSharedProcessStarted(sharedProc, adapterInfo, forceRestart)
                 }
+                SESSION_LOG.info("[AgentDock] process started; creating session... adapter=$requestedAdapterName")
                 ensureAsyncSessionUpdates(sharedProc)
 
                 val runtimeMetadata = adapterRuntimeMetadataMap[requestedAdapterName]
                 val savedPreference = AcpAgentPreferencesStore.preferenceFor(requestedAdapterName)
                 val client = sharedProc.client
                     ?: throw IllegalStateException("ACP client was not initialized for adapter '$requestedAdapterName'")
-                val cwd = resolveSessionCwd(project.basePath ?: System.getProperty("user.dir"))
+                val cwd = resolveSessionCwd(context.cwdOverride ?: project.basePath ?: System.getProperty("user.dir"))
 
                 val factory = object : ClientOperationsFactory {
                     override suspend fun createClientOperations(
@@ -130,7 +149,9 @@ internal suspend fun AcpClientService.startAgent(
                 }
 
                 val params = SessionCreationParameters(cwd = cwd, mcpServers = buildMcpServers())
+                SESSION_LOG.info("[AgentDock] createOrResumeSession... adapter=$requestedAdapterName cwd='$cwd' resume=${resumeSessionId != null}")
                 val session = createOrResumeSession(client, params, factory, resumeSessionId)
+                SESSION_LOG.info("[AgentDock] session created sessionId=${session.sessionId.value}")
 
                 context.session = session
                 context.sessionIdRef.set(session.sessionId.value)
@@ -151,7 +172,9 @@ internal suspend fun AcpClientService.startAgent(
 
                 context.activeAdapterNameRef.set(requestedAdapterName)
                 context.statusRef.set(AcpClientService.Status.Ready)
+                SESSION_LOG.info("[AgentDock] startAgent OK chat=$chatId adapter=$requestedAdapterName cwd='$cwd'")
             } catch (e: Exception) {
+                SESSION_LOG.warn("[AgentDock] startAgent FAILED chat=$chatId adapter=$requestedAdapterName override='${context.cwdOverride}'", e)
                 context.stop()
                 context.statusRef.set(AcpClientService.Status.Error)
                 throw e
@@ -432,7 +455,7 @@ internal suspend fun AcpClientService.loadSessionIntoContext(
 
     val client = sharedProc.client
         ?: throw IllegalStateException("ACP client was not initialized for adapter '$requestedAdapterName'")
-    val cwd = resolveSessionCwd(project.basePath ?: System.getProperty("user.dir"))
+    val cwd = resolveSessionCwd(context.cwdOverride ?: project.basePath ?: System.getProperty("user.dir"))
 
     val factory = object : ClientOperationsFactory {
         override suspend fun createClientOperations(

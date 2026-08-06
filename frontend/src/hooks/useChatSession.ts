@@ -11,7 +11,37 @@ import {
   RichContentBlock
 } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
+import { useActiveFile } from './useActiveFile';
 import { buildReplayMessages } from '../utils/replay';
+
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+// True only when the file lives inside the workspace root. The editor's open file belongs to the
+// IDE project window, which may differ from the conversation's workspace (e.g. editor on /opt/mono
+// while this chat runs in /opt/agent-0) — attaching an out-of-workspace file would be wrong context.
+function fileInWorkspace(filePath: string, rootPath: string): boolean {
+  if (!filePath || !rootPath) return false;
+  const f = normalizePath(filePath);
+  const r = normalizePath(rootPath);
+  return f === r || f.startsWith(`${r}/`);
+}
+
+// Auto-context: prepend the currently open editor file as a @-reference so the agent knows what the
+// user is looking at ("aware of the file I have open") — but ONLY if that file is within THIS
+// conversation's workspace. Skipped if the prompt already references it.
+function prependActiveFileContext(
+  blocks: RichContentBlock[],
+  file: { path: string; name: string },
+  rootPath: string
+): RichContentBlock[] {
+  if (!file.path || !fileInWorkspace(file.path, rootPath)) return blocks;
+  const already = blocks.some((b) => b.type === 'code_ref' && b.path === file.path);
+  if (already) return blocks;
+  const ref: RichContentBlock = { type: 'code_ref', name: file.name || file.path, path: file.path, isInline: true };
+  return [ref, ...blocks];
+}
 import { lastAssistantMessageHasMeta } from './chatSession/messageProcessing';
 import {
   nextMessageId,
@@ -123,7 +153,8 @@ export function useChatSession(
   forkBase?: ForkConversationBase,
   onHandoffConsumed?: (handoffId: string) => void,
   onUserMessageSent?: () => void,
-  onRenamed?: (title: string) => void
+  onRenamed?: (title: string) => void,
+  rootPath?: string
 ) {
   const [historyMessages, setHistoryMessages] = useState<Message[]>(initialMessages);
   const [liveMessages, setLiveMessages] = useState<Message[]>([]);
@@ -137,6 +168,9 @@ export function useChatSession(
   const permissionRequest = permissionQueue[0] ?? null;
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [acpSessionId, setAcpSessionId] = useState<string>('');
+  const activeFile = useActiveFile();
+  const activeFileRef = useRef(activeFile);
+  activeFileRef.current = activeFile;
   const messages = useMemo(() => [...historyMessages, ...liveMessages], [historyMessages, liveMessages]);
   const selectedAgentId = initialAgentId || '';
 
@@ -386,7 +420,8 @@ export function useChatSession(
         selectedAgentId,
         modelId || undefined,
         selectedModeId || undefined,
-        selectedReasoningEffortId || undefined
+        selectedReasoningEffortId || undefined,
+        rootPath || undefined
       ).catch((error) => {
         console.warn('[useChatSession] Failed to start agent:', error);
         const message = error instanceof Error ? error.message : String(error);
@@ -482,7 +517,8 @@ export function useChatSession(
           selectedAgentId,
           selectedModelId || undefined,
           selectedModeId || undefined,
-          selectedReasoningEffortId || undefined
+          selectedReasoningEffortId || undefined,
+          rootPath || undefined
         ).then(() => {
           forkBaseRef.current = undefined;
           consumeHandoff();
@@ -638,9 +674,12 @@ export function useChatSession(
 
   const sendPreparedPrompt = useCallback((
     displayBlocks: RichContentBlock[],
-    outgoingBlocks: RichContentBlock[],
+    outgoingBlocksRaw: RichContentBlock[],
     displayText: string
   ) => {
+    // Auto-attach the open editor file (agent-only; the displayed user message is left as typed).
+    // Gated to files inside this conversation's workspace so a chat in another root isn't polluted.
+    const outgoingBlocks = prependActiveFileContext(outgoingBlocksRaw, activeFileRef.current, rootPath || '');
     allowMetadataUpdateRef.current = true;
     touchUpdatedAtRef.current = true;
     onUserMessageSent?.();
@@ -687,7 +726,8 @@ export function useChatSession(
       selectedAgentId,
       selectedModelId || undefined,
       selectedModeId || undefined,
-      selectedReasoningEffortId || undefined
+      selectedReasoningEffortId || undefined,
+      rootPath || undefined
     ).then(() => {
       forkBaseRef.current = undefined;
       consumeHandoff();

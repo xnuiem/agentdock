@@ -208,6 +208,16 @@ class AcpClientService private constructor(val project: Project) {
 
     fun status(chatId: String): Status = sessions[chatId]?.statusRef?.get() ?: Status.NotStarted
     fun sessionId(chatId: String): String? = sessions[chatId]?.sessionIdRef?.get()
+
+    /**
+     * The host-side root directory a conversation is scoped to. Returns the workspace root the
+     * frontend registered for this chat (set at start/prompt time), falling back to the single
+     * IntelliJ project base for legacy/no-workspace conversations. Always the HOST display form
+     * (e.g. //wsl.localhost/<distro>/opt/mono) so it slugs history identically to the read side;
+     * WSL-native conversion only happens later, inside resolveSessionCwd at agent-spawn time.
+     */
+    fun sessionRootPath(chatId: String): String =
+        sessions[chatId]?.cwdOverride ?: project.basePath.orEmpty()
     fun activeModelId(chatId: String): String? = sessions[chatId]?.activeModelIdRef?.get()
     fun activeModeId(chatId: String): String? = sessions[chatId]?.activeModeIdRef?.get()
     fun adapterInitializationStatus(adapterName: String): AdapterInitializationStatus {
@@ -320,6 +330,11 @@ class AcpClientService private constructor(val project: Project) {
 
         @Volatile var sharedProcess: SharedProcess? = null
         @Volatile var session: ClientSession? = null
+
+        // Host-side workspace root for this conversation, registered by the frontend on
+        // start/prompt. Persisted across stop()/restart because a conversation's workspace never
+        // changes; re-set on every startAgent anyway. null => fall back to project.basePath.
+        @Volatile var cwdOverride: String? = null
 
         fun stop() {
             session = null

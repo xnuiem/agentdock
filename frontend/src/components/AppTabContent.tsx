@@ -5,6 +5,7 @@ import { DesignSystemView } from './DesignSystem';
 import HistoryPanel from './HistoryPanel';
 import { KanbanBoardView } from './kanban/KanbanBoardView';
 import { McpServersView } from './McpServersView';
+import { LspServersView } from './LspServersView';
 import { PromptLibraryView } from './PromptLibraryView';
 import { SettingsView } from './SettingsView';
 import { SystemInstructionsView } from './SystemInstructionsView';
@@ -80,6 +81,7 @@ export function AppTabContent({
           metadataTitleOverride={tab.metadataTitleOverride}
           inheritedAdapterNames={tab.inheritedAdapterNames}
           forkBase={tab.forkBase}
+          rootPath={tab.rootPath}
           availableAgents={runnableAgents}
           isActive={isActive}
           onUserMessageSent={onUserMessageSent}
@@ -106,6 +108,7 @@ export function AppTabContent({
             <HistoryPanel availableAgents={availableAgents} onOpenSession={onOpenHistory} />
           )}
           {tab.type === 'mcp' && <McpServersView />}
+          {tab.type === 'lsp' && <LspServersView rootPath={tab.rootPath} />}
           {tab.type === 'kanban' && (
             <KanbanBoardView tabs={tabs} tabUi={tabUi} onSelectTab={onSelectTab} onOpenHistorySession={onOpenHistory} />
           )}

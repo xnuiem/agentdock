@@ -26,7 +26,9 @@ const defaultGlobalSettings: GlobalSettingsPayload = {
     gitCommitGeneration: { enabled: false, adapterId: '', modelId: '', instructions: '' },
     quotaWidgetEnabled: false,
     executionTarget: 'local',
-    wslDistro: ''
+    wslDistro: '',
+    workspaces: [],
+    activeWorkspaceId: ''
   }
 };
 
@@ -69,7 +71,10 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       gitCommitGeneration: normalizeGitCommitGenerationSettings(payload?.settings?.gitCommitGeneration),
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       executionTarget: payload?.settings?.executionTarget === 'wsl' ? 'wsl' : 'local',
-      wslDistro: payload?.settings?.wslDistro?.trim() ?? ''
+      wslDistro: payload?.settings?.wslDistro?.trim() ?? '',
+      // Preserve workspace fields untouched so saving other settings never wipes the workspace list.
+      workspaces: payload?.settings?.workspaces ?? [],
+      activeWorkspaceId: payload?.settings?.activeWorkspaceId ?? ''
     }
   };
 }

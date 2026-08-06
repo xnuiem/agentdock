@@ -280,6 +280,15 @@ export function AgentManagementView({
               : statusLabel === 'Ready'
                 ? 'text-success'
                 : 'text-error';
+            // Loaded-and-active dot: green = ready, amber = starting/probing (unknown), red = not ready,
+            // grey = not downloaded. Amber avoids mislabeling a still-initializing adapter as broken.
+            const statusDotClass = !isDownloaded
+              ? 'bg-foreground-secondary/40'
+              : (isStarting || isStatusUnknown)
+                ? 'bg-warning'
+                : statusLabel === 'Ready'
+                  ? 'bg-success'
+                  : 'bg-error';
 
             return (
               <div key={agent.id} className={`flex group ${!isLast ? 'border-b border-border' : ''}`}>
@@ -290,6 +299,10 @@ export function AgentManagementView({
 
                   <div className="min-w-0 flex-1 self-center py-2 text-ide-small text-foreground-secondary">
                     <div className="flex items-baseline gap-1.5 mb-1">
+                      <span
+                        className={`inline-block h-2 w-2 shrink-0 self-center rounded-full ${statusDotClass}`}
+                        title={isDownloaded ? statusLabel : 'Not installed'}
+                      />
                       <div className="font-semibold text-ide-regular text-foreground">{agent.name}</div>
                       {versionLabel && (<span className="text-foreground-secondary">{versionLabel}</span>)}
                     </div>

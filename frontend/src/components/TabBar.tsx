@@ -28,6 +28,7 @@ interface TabBarProps {
   onOpenManagement: () => void;
   onOpenDesignSystem: () => void;
   onOpenMcp: () => void;
+  onOpenLsp: () => void;
   onOpenPromptLibrary: () => void;
   onOpenSystemInstructions: () => void;
   onOpenSettings: () => void;
@@ -50,6 +51,7 @@ export default function TabBar({
   onOpenManagement,
   onOpenDesignSystem,
   onOpenMcp,
+  onOpenLsp,
   onOpenPromptLibrary,
   onOpenSystemInstructions,
   onOpenSettings,
@@ -383,6 +385,7 @@ export default function TabBar({
               onOpenManagement={onOpenManagement}
               onOpenDesignSystem={onOpenDesignSystem}
               onOpenMcp={onOpenMcp}
+              onOpenLsp={onOpenLsp}
               onOpenPromptLibrary={onOpenPromptLibrary}
               onOpenSystemInstructions={onOpenSystemInstructions}
               onOpenSettings={onOpenSettings}

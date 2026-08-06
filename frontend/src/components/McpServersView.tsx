@@ -238,6 +238,17 @@ export function McpServersView() {
               </div>
 
               <div className='flex flex-shrink-0 items-center gap-2'>
+                <Tooltip variant="minimal" content="Reconnect (re-check status)">
+                  <button
+                    type="button"
+                    onClick={() => ACPBridge.checkMcpStatus()}
+                    disabled={!s.enabled}
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    aria-label={`Reconnect ${s.name}`}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </Tooltip>
                 <Tooltip variant="minimal" content="Edit">
                   <button
                     type="button"

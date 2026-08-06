@@ -10,7 +10,7 @@ internal fun AcpBridge.beginLivePromptCapture(
     blocks: List<JsonObject>,
     forkBase: ForkConversationBase?
 ): String? {
-    val projectPath = service.project.basePath.orEmpty()
+    val projectPath = service.sessionRootPath(chatId)
     val sessionId = service.sessionId(chatId).orEmpty()
     val adapterName = service.activeAdapterName(chatId).orEmpty()
     if (projectPath.isBlank() || sessionId.isBlank() || adapterName.isBlank()) return null

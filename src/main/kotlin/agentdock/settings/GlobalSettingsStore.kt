@@ -50,8 +50,15 @@ object GlobalSettingsStore {
                 instructions = settings.gitCommitGeneration.instructions.trim()
             ),
             executionTarget = normalizeExecutionTarget(settings.executionTarget),
-            wslDistro = settings.wslDistro.trim()
-        )
+            wslDistro = settings.wslDistro.trim(),
+            workspaces = normalizeWorkspaces(settings.workspaces),
+            activeWorkspaceId = settings.activeWorkspaceId.trim()
+        ).let { normalized ->
+            // Drop a dangling active id that no longer resolves to a workspace.
+            if (normalized.activeWorkspaceId.isNotEmpty() &&
+                normalized.workspaces.none { it.id == normalized.activeWorkspaceId }
+            ) normalized.copy(activeWorkspaceId = "") else normalized
+        }
         val file = settingsFile()
         file.parentFile?.mkdirs()
         file.atomicWriteText(json.encodeToString(normalized))
@@ -121,6 +128,17 @@ object GlobalSettingsStore {
             "default", "blue", "background-secondary", "primary", "secondary", "accent", "input", "editor-bg" -> style.trim().lowercase()
             else -> "default"
         }
+    }
+
+    private fun normalizeWorkspaces(workspaces: List<Workspace>): List<Workspace> {
+        val seenRoots = HashSet<String>()
+        return workspaces
+            .asSequence()
+            .map { it.copy(rootPath = it.rootPath.trim(), name = it.name.trim(), id = it.id.trim()) }
+            .filter { it.id.isNotEmpty() && it.rootPath.isNotEmpty() }
+            // Dedupe by rootPath (first wins) so the same dir can't be registered twice.
+            .filter { seenRoots.add(it.rootPath) }
+            .toList()
     }
 
     private fun normalizeExecutionTarget(target: String?): String {

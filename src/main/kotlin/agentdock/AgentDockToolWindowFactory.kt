@@ -31,6 +31,8 @@ import agentdock.history.HistoryBridge
 import agentdock.mcp.McpBridge
 import agentdock.promptlibrary.PromptLibraryBridge
 import agentdock.settings.SettingsBridge
+import agentdock.workspace.WorkspaceBridge
+import agentdock.editor.EditorContextBridge
 import agentdock.systeminstructions.SystemInstructionsBridge
 import java.awt.BorderLayout
 import java.awt.Cursor
@@ -106,6 +108,8 @@ class AgentDockToolWindowFactory : ToolWindowFactory, DumbAware {
                         val systemInstructionsBridge = SystemInstructionsBridge(browser, scope)
                         val promptLibraryBridge = PromptLibraryBridge(browser, scope)
                         val settingsBridge = SettingsBridge(browser, scope)
+                        val workspaceBridge = WorkspaceBridge(browser, project, scope)
+                        val editorContextBridge = EditorContextBridge(browser, project)
 
                         acpBridge.install()
                         historyBridge.install()
@@ -113,6 +117,8 @@ class AgentDockToolWindowFactory : ToolWindowFactory, DumbAware {
                         systemInstructionsBridge.install()
                         promptLibraryBridge.install()
                         settingsBridge.install()
+                        workspaceBridge.install()
+                        editorContextBridge.install()
 
 
                         // Solve JCEF cursor: pointer not working issue on Windows
@@ -184,6 +190,8 @@ class AgentDockToolWindowFactory : ToolWindowFactory, DumbAware {
                                     systemInstructionsBridge.injectApi(cefBrowser)
                                     promptLibraryBridge.injectApi(cefBrowser)
                                     settingsBridge.injectApi(cefBrowser)
+                                    workspaceBridge.injectApi(cefBrowser)
+                                    editorContextBridge.injectApi(cefBrowser)
                                 }
                             }
                         }, browser.cefBrowser)

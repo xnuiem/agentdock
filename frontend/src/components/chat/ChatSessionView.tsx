@@ -32,6 +32,7 @@ interface ChatSessionProps {
   metadataTitleOverride?: string;
   inheritedAdapterNames?: string[];
   forkBase?: ForkConversationBase;
+  rootPath?: string;
   isActive?: boolean;
   onUserMessageSent?: () => void;
   onRenamed?: (title: string) => void;
@@ -59,6 +60,7 @@ export default function ChatSessionView({
   metadataTitleOverride,
   inheritedAdapterNames,
   forkBase,
+  rootPath,
   isActive = false,
   onUserMessageSent,
   onRenamed,
@@ -123,7 +125,8 @@ export default function ChatSessionView({
     forkBase,
     onHandoffConsumed,
     onUserMessageSent,
-    onRenamed
+    onRenamed,
+    rootPath
   );
 
   const {

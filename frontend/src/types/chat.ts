@@ -186,7 +186,15 @@ export interface TabUiFlags {
   adapterDisplayName?: string;
 }
 
-export type TabType = 'chat' | 'management' | 'design' | 'history' | 'mcp' | 'system-instructions' | 'prompt-library' | 'settings' | 'kanban';
+export type TabType = 'chat' | 'management' | 'design' | 'history' | 'mcp' | 'system-instructions' | 'prompt-library' | 'settings' | 'kanban' | 'lsp';
+
+export interface LspServer {
+  name: string;
+  command: string;
+  extensions: string;
+  disabled: boolean;
+  source: string; // the opencode config file it came from
+}
 
 export interface ChatTab {
   id: string;
@@ -199,6 +207,39 @@ export interface ChatTab {
   metadataTitleOverride?: string;
   inheritedAdapterNames?: string[];
   forkBase?: ForkConversationBase;
+  workspaceId?: string; // Workspace this tab belongs to (see WorkspaceRail)
+  rootPath?: string;    // Host-side root dir, threaded to the agent cwd + history scope
+}
+
+export interface Workspace {
+  id: string;
+  name: string;      // display; defaults to basename(rootPath), renameable
+  rootPath: string;  // dir as IntelliJ sees it (UNC //wsl.localhost/... for WSL)
+  addedAt: number;
+}
+
+export interface WorkspacePickedPayload {
+  rootPath: string;
+  name: string;
+  isGitRepo: boolean;
+  sameTarget: boolean;
+  cancelled: boolean;
+  error?: string;
+}
+
+export interface WorkspaceProjectRootPayload {
+  rootPath: string;
+  name: string;
+}
+
+export interface WorkspaceActivity {
+  rootPath: string;
+  lastActivityMillis: number;
+}
+
+export interface ActiveFilePayload {
+  path: string;
+  name: string;
 }
 
 export interface HistoryDeleteFailure {
@@ -471,6 +512,8 @@ export interface GlobalSettings {
   quotaWidgetEnabled: boolean;
   executionTarget: 'local' | 'wsl';
   wslDistro: string;
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
 }
 
 export interface GlobalSettingsPayload {
@@ -486,7 +529,8 @@ declare global {
       modelId?: string,
       modeId?: string,
       requestId?: string,
-      reasoningEffortId?: string
+      reasoningEffortId?: string,
+      projectPath?: string
     ) => void;
     __sendPrompt?: (
       conversationId: string,
@@ -496,7 +540,8 @@ declare global {
       adapterId?: string,
       modelId?: string,
       modeId?: string,
-      reasoningEffortId?: string
+      reasoningEffortId?: string,
+      projectPath?: string
     ) => void;
     __requestAdapters?: () => void;
     __notifyReady?: () => void;
@@ -584,6 +629,16 @@ declare global {
     __saveGlobalSettings?: (payload: string) => void;
     __onGlobalSettings?: (payload: GlobalSettingsPayload) => void;
     __onAdapterDeleted?: (adapterId: string) => void;
+    __pickWorkspaceDirectory?: () => void;
+    __onWorkspacePicked?: (payload: WorkspacePickedPayload) => void;
+    __requestWorkspaceProjectRoot?: () => void;
+    __onWorkspaceProjectRoot?: (payload: WorkspaceProjectRootPayload) => void;
+    __requestWorkspaceActivity?: (payload: string) => void;
+    __onWorkspaceActivity?: (payload: WorkspaceActivity[]) => void;
+    __requestActiveFile?: () => void;
+    __onActiveFile?: (payload: ActiveFilePayload) => void;
+    __requestLspServers?: (rootPath: string) => void;
+    __onLspServers?: (servers: LspServer[]) => void;
     __settingsBridgeReady?: boolean;
   }
 }

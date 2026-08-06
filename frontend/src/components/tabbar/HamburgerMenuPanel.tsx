@@ -25,6 +25,7 @@ interface HamburgerMenuPanelProps {
   onOpenManagement: () => void;
   onOpenDesignSystem: () => void;
   onOpenMcp: () => void;
+  onOpenLsp: () => void;
   onOpenPromptLibrary: () => void;
   onOpenSystemInstructions: () => void;
   onOpenSettings: () => void;
@@ -39,6 +40,7 @@ export function HamburgerMenuPanel({
   onOpenManagement,
   onOpenDesignSystem,
   onOpenMcp,
+  onOpenLsp,
   onOpenPromptLibrary,
   onOpenSystemInstructions,
   onOpenSettings,
@@ -54,6 +56,7 @@ export function HamburgerMenuPanel({
     { label: 'Prompt Library', icon: <PromptLibraryTabIcon />, onClick: onOpenPromptLibrary },
     { label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions },
     { label: 'MCP Servers', icon: <McpTabIcon />, onClick: onOpenMcp },
+    { label: 'LSP Servers', icon: <McpTabIcon />, onClick: onOpenLsp },
     ...(isDev ? [{ label: 'Design System', icon: <DesignTabIcon />, onClick: onOpenDesignSystem }] : []),
   ];
 

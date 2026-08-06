@@ -11,9 +11,9 @@ import agentdock.utils.escapeForJsString
  * (injectReadySignal runs first on page load and only sets no-op stubs for __on* and __downloadAgent etc.)
  */
 internal fun AcpBridge.injectDebugApi(cefBrowser: CefBrowser) {
-    val startAgentInject = startAgentQuery?.inject("JSON.stringify({ requestId: (requestId || ''), chatId: chatId, adapterId: (adapterId || ''), modelId: (modelId || ''), modeId: (modeId || ''), reasoningEffortId: (reasoningEffortId || '') })") ?: ""
+    val startAgentInject = startAgentQuery?.inject("JSON.stringify({ requestId: (requestId || ''), chatId: chatId, adapterId: (adapterId || ''), modelId: (modelId || ''), modeId: (modeId || ''), reasoningEffortId: (reasoningEffortId || ''), projectPath: (projectPath || '') })") ?: ""
     val listAdaptersInject = listAdaptersQuery?.inject("") ?: ""
-    val sendPromptInject = sendPromptQuery?.inject("JSON.stringify({ requestId: (requestId || ''), chatId: chatId, text: message, forkBase: forkBase || null, adapterId: (adapterId || ''), modelId: (modelId || ''), modeId: (modeId || ''), reasoningEffortId: (reasoningEffortId || '') })") ?: ""
+    val sendPromptInject = sendPromptQuery?.inject("JSON.stringify({ requestId: (requestId || ''), chatId: chatId, text: message, forkBase: forkBase || null, adapterId: (adapterId || ''), modelId: (modelId || ''), modeId: (modeId || ''), reasoningEffortId: (reasoningEffortId || ''), projectPath: (projectPath || '') })") ?: ""
     val cancelPromptInject = cancelPromptQuery?.inject("JSON.stringify({ requestId: (requestId || ''), chatId: chatId })") ?: ""
     val stopAgentInject = stopAgentQuery?.inject("chatId") ?: ""
     val respondPermissionInject = respondPermissionQuery?.inject("JSON.stringify({ requestId: requestId, decision: decision })") ?: ""
@@ -50,12 +50,12 @@ internal fun AcpBridge.injectDebugApi(cefBrowser: CefBrowser) {
             window.__requestAdapters = function() {
                 try { $listAdaptersInject } catch (e) { }
             };
-            window.__startAgent = function(chatId, adapterId, modelId, modeId, requestId, reasoningEffortId) {
+            window.__startAgent = function(chatId, adapterId, modelId, modeId, requestId, reasoningEffortId, projectPath) {
                 try {
                     $startAgentInject
                 } catch (e) { }
             };
-            window.__sendPrompt = function(chatId, message, requestId, forkBase, adapterId, modelId, modeId, reasoningEffortId) {
+            window.__sendPrompt = function(chatId, message, requestId, forkBase, adapterId, modelId, modeId, reasoningEffortId, projectPath) {
                 try {
                     $sendPromptInject
                 } catch (e) { }

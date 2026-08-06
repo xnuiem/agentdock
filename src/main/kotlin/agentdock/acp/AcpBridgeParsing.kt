@@ -10,7 +10,8 @@ internal data class ParsedStartPayload(
     val adapterId: String?,
     val modelId: String?,
     val modeId: String?,
-    val reasoningEffortId: String?
+    val reasoningEffortId: String?,
+    val rootPath: String?
 )
 
 internal data class ParsedBlocksPayload(
@@ -22,7 +23,8 @@ internal data class ParsedBlocksPayload(
     val adapterId: String?,
     val modelId: String?,
     val modeId: String?,
-    val reasoningEffortId: String?
+    val reasoningEffortId: String?,
+    val rootPath: String?
 )
 
 internal data class ParsedCancelPayload(
@@ -41,7 +43,7 @@ internal fun parseStartPayload(payload: String?): Triple<String?, String?, Strin
 
 internal fun parseStartRequestPayload(payload: String?): ParsedStartPayload {
     val raw = payload?.trim().orEmpty()
-    if (raw.isEmpty()) return ParsedStartPayload(null, null, null, null, null, null)
+    if (raw.isEmpty()) return ParsedStartPayload(null, null, null, null, null, null, null)
     return try {
         val obj = Json.parseToJsonElement(raw).jsonObject
         val requestId = obj["requestId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -50,8 +52,9 @@ internal fun parseStartRequestPayload(payload: String?): ParsedStartPayload {
         val modelId = obj["modelId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         val modeId = obj["modeId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         val reasoningEffortId = obj["reasoningEffortId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        ParsedStartPayload(requestId, chatId, adapterId, modelId, modeId, reasoningEffortId)
-    } catch (_: Exception) { ParsedStartPayload(null, null, null, null, null, null) }
+        val rootPath = obj["projectPath"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        ParsedStartPayload(requestId, chatId, adapterId, modelId, modeId, reasoningEffortId, rootPath)
+    } catch (_: Exception) { ParsedStartPayload(null, null, null, null, null, null, null) }
 }
 
 internal fun parseConversationLoadPayload(payload: String?): Triple<String?, String?, String?> {
@@ -81,7 +84,7 @@ internal fun parseHistoryConversationCliPayload(payload: String?): Pair<String?,
 
 internal fun parseBlocksPayload(payload: String?): ParsedBlocksPayload {
     val raw = payload?.trim().orEmpty()
-    if (raw.isEmpty()) return ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, null, null, null)
+    if (raw.isEmpty()) return ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, null, null, null, null)
     return try {
         val obj = Json.parseToJsonElement(raw).jsonObject
         val requestId = obj["requestId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
@@ -91,6 +94,7 @@ internal fun parseBlocksPayload(payload: String?): ParsedBlocksPayload {
         val modelId = obj["modelId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         val modeId = obj["modeId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         val reasoningEffortId = obj["reasoningEffortId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        val rootPath = obj["projectPath"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
 
         // 1. Try to get blocks directly if present
         val blocksElement = obj["blocks"]
@@ -104,7 +108,8 @@ internal fun parseBlocksPayload(payload: String?): ParsedBlocksPayload {
                 adapterId = adapterId,
                 modelId = modelId,
                 modeId = modeId,
-                reasoningEffortId = reasoningEffortId
+                reasoningEffortId = reasoningEffortId,
+                rootPath = rootPath
             )
         }
 
@@ -125,7 +130,8 @@ internal fun parseBlocksPayload(payload: String?): ParsedBlocksPayload {
                     adapterId = adapterId,
                     modelId = modelId,
                     modeId = modeId,
-                    reasoningEffortId = reasoningEffortId
+                    reasoningEffortId = reasoningEffortId,
+                    rootPath = rootPath
                 )
             }.getOrNull()?.takeIf { it.blocks.isNotEmpty() }?.let { parsed ->
                 return parsed
@@ -147,9 +153,10 @@ internal fun parseBlocksPayload(payload: String?): ParsedBlocksPayload {
             adapterId = adapterId,
             modelId = modelId,
             modeId = modeId,
-            reasoningEffortId = reasoningEffortId
+            reasoningEffortId = reasoningEffortId,
+            rootPath = rootPath
         )
-    } catch (_: Exception) { ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, null, null, null) }
+    } catch (_: Exception) { ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, null, null, null, null) }
 }
 
 private fun parseForkConversationBase(element: JsonElement?): ForkConversationBase? {

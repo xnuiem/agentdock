@@ -11,6 +11,7 @@ import { ACPBridge } from '../../utils/bridge';
 import { useAvailableAgents } from '../useAvailableAgents';
 import { useHistoryTitleSync } from '../useHistoryTitleSync';
 import { useAppTabUiState } from './useAppTabUiState';
+import { useWorkspaces } from './useWorkspaces';
 
 let tabCounter = 0;
 
@@ -58,6 +59,30 @@ export function useAppController() {
   const [activeTabId, setActiveTabId] = useState<string>('');
   const { availableAgents, adaptersResolved, lastStableNewTabAgentIdRef } = useAvailableAgents();
   const [tabSessionState, setTabSessionState] = useState<Record<string, TabSessionState>>({});
+
+  const {
+    workspaces,
+    activeWorkspaceId,
+    activeWorkspace,
+    addError: workspaceAddError,
+    clearAddError: clearWorkspaceAddError,
+    selectWorkspace,
+    renameWorkspace,
+    removeWorkspace,
+    beginAddWorkspace,
+  } = useWorkspaces();
+
+  // Refs so tab-creation callbacks can stamp the active workspace without re-subscribing on every change.
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
+  const activeWorkspaceRootRef = useRef(activeWorkspace?.rootPath);
+  activeWorkspaceRootRef.current = activeWorkspace?.rootPath;
+  const wsStamp = () => ({ workspaceId: activeWorkspaceIdRef.current, rootPath: activeWorkspaceRootRef.current });
+
+  // Remember which tab was active in each workspace, to restore on switch.
+  const [activeTabIdByWorkspace, setActiveTabIdByWorkspace] = useState<Record<string, string>>({});
+  const activeTabIdByWorkspaceRef = useRef(activeTabIdByWorkspace);
+  activeTabIdByWorkspaceRef.current = activeTabIdByWorkspace;
   const [pendingAgentSwitch, setPendingAgentSwitch] = useState<PendingAgentSwitch | null>(null);
   const [pendingHandoffsByTab, setPendingHandoffsByTab] = useState<Record<string, PendingHandoffContext>>({});
   const pendingConversationContinuationsRef = useRef<Record<string, PendingConversationContinuation>>({});
@@ -67,11 +92,50 @@ export function useAppController() {
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
 
+  // Adopt any orphan tabs (created before a workspace existed at first startup) into the active one.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    setTabs(prev => {
+      let changed = false;
+      const next = prev.map(tab => {
+        if (!tab.workspaceId) {
+          changed = true;
+          return { ...tab, workspaceId: activeWorkspaceId, rootPath: tab.rootPath ?? activeWorkspaceRootRef.current };
+        }
+        return tab;
+      });
+      return changed ? next : prev;
+    });
+  }, [activeWorkspaceId]);
+
+  // Record the active tab per workspace so switching back restores it.
+  useEffect(() => {
+    if (!activeWorkspaceId || !activeTabId) return;
+    setActiveTabIdByWorkspace(prev =>
+      prev[activeWorkspaceId] === activeTabId ? prev : { ...prev, [activeWorkspaceId]: activeTabId }
+    );
+  }, [activeTabId, activeWorkspaceId]);
+
+  const visibleTabs = useMemo(
+    () => tabs.filter(tab => tab.workspaceId === activeWorkspaceId),
+    [tabs, activeWorkspaceId]
+  );
+
+  const handleSelectWorkspace = useCallback((id: string) => {
+    if (id === activeWorkspaceIdRef.current) return;
+    selectWorkspace(id);
+    const remembered = activeTabIdByWorkspaceRef.current[id];
+    const rememberedValid = remembered && tabsRef.current.some(t => t.id === remembered && t.workspaceId === id);
+    const firstInWs = tabsRef.current.find(t => t.workspaceId === id);
+    setActiveTabId(rememberedValid ? remembered : (firstInWs?.id || ''));
+    const ws = workspaces.find(w => w.id === id);
+    if (ws?.rootPath) ACPBridge.requestHistoryList(ws.rootPath);
+  }, [selectWorkspace, workspaces]);
+
   const {
     tabUi,
     initTabUi,
     cleanupTabUiState,
-    resetTabUiState,
     markTabReadIfAllowed,
     clearTabUnread,
     handleAssistantActivity,
@@ -167,7 +231,7 @@ export function useAppController() {
     const newId = nextId('tab');
     const newConversationId = nextId('conv');
     const title = 'New';
-    setTabs((prev) => [...prev, { id: newId, type: 'chat', title, conversationId: newConversationId, agentId: resolvedAgentId }]);
+    setTabs((prev) => [...prev, { id: newId, type: 'chat', title, conversationId: newConversationId, agentId: resolvedAgentId, ...wsStamp() }]);
     initTabUi(newId);
     setActiveTabId(newId);
   }, [initTabUi, lastStableNewTabAgentIdRef, runnableAgents]);
@@ -252,7 +316,7 @@ export function useAppController() {
 
     setTabs(prev => {
       const remaining = prev.filter(item => item.id !== pendingAgentSwitch.tabId);
-      return [...remaining, { id: newId, type: 'chat', title, conversationId: newConversationId, agentId: resolvedAgentId }];
+      return [...remaining, { id: newId, type: 'chat', title, conversationId: newConversationId, agentId: resolvedAgentId, ...wsStamp() }];
     });
     cleanupTabUi(pendingAgentSwitch.tabId);
     setActiveTabId(newId);
@@ -336,6 +400,8 @@ export function useAppController() {
         title,
         conversationId: newConversationId,
         agentId: resolvedAgentId,
+        workspaceId: sourceTab.workspaceId ?? activeWorkspaceIdRef.current,
+        rootPath: sourceTab.rootPath ?? activeWorkspaceRootRef.current,
         initialMessages: payload.messages,
         metadataTitleOverride: title,
         inheritedAdapterNames,
@@ -354,13 +420,16 @@ export function useAppController() {
   }, [initTabUi, runnableAgents, tabSessionState]);
 
   const openSingletonTab = useCallback((type: TabType, title: string) => {
-    const existing = tabsRef.current.find(t => t.type === type);
+    // Singletons are per-workspace: each workspace gets its own instance, so a workspace-scoped
+    // view (LSPs, review changes) reflects the active workspace and stays visible after a switch.
+    const wsId = activeWorkspaceIdRef.current;
+    const existing = tabsRef.current.find(t => t.type === type && t.workspaceId === wsId);
     if (existing) {
       setActiveTabId(existing.id);
       return;
     }
     const newId = nextId('tab');
-    setTabs(prev => [...prev, { id: newId, type, title, conversationId: newId }]);
+    setTabs(prev => [...prev, { id: newId, type, title, conversationId: newId, ...wsStamp() }]);
     setActiveTabId(newId);
   }, []);
 
@@ -420,17 +489,18 @@ export function useAppController() {
   }, []);
 
   const handleCloseAllTabs = useCallback(() => {
-    if (typeof window.__stopAgent === 'function') {
-      tabs.forEach((tab) => {
-        if (tab.type === 'chat') {
-          try { window.__stopAgent?.(tab.conversationId); } catch (e) {}
-        }
-      });
-    }
-    setTabs([]);
-    resetTabUiState();
+    // Close only the active workspace's tabs; other workspaces keep their sessions alive.
+    const wsId = activeWorkspaceIdRef.current;
+    const toClose = tabsRef.current.filter(tab => tab.workspaceId === wsId);
+    toClose.forEach((tab) => {
+      if (tab.type === 'chat') {
+        try { window.__stopAgent?.(tab.conversationId); } catch (e) {}
+      }
+      cleanupTabUi(tab.id);
+    });
+    setTabs(prev => prev.filter(tab => tab.workspaceId !== wsId));
     setActiveTabId('');
-  }, [resetTabUiState, tabs]);
+  }, [cleanupTabUi]);
 
   const handleOpenHistory = useCallback((item: HistorySessionMeta) => {
     const conversationKey = item.conversationId;
@@ -456,6 +526,8 @@ export function useAppController() {
         conversationId: conversationKey,
         agentId: item.adapterName,
         historySession: item,
+        workspaceId: activeWorkspaceIdRef.current,
+        rootPath: item.projectPath || activeWorkspaceRootRef.current,
         inheritedAdapterNames: item.allAdapterNames || [item.adapterName]
       }
     ]);
@@ -480,8 +552,18 @@ export function useAppController() {
 
   return {
     tabs,
+    visibleTabs,
     activeTabId,
     tabUi,
+    workspaces,
+    activeWorkspaceId,
+    activeWorkspace,
+    workspaceAddError,
+    clearWorkspaceAddError,
+    handleSelectWorkspace,
+    handleRenameWorkspace: renameWorkspace,
+    handleRemoveWorkspace: removeWorkspace,
+    handleAddWorkspace: beginAddWorkspace,
     availableAgents,
     runnableAgents,
     agentAvailabilityResolved,

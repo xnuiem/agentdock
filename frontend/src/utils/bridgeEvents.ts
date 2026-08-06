@@ -17,6 +17,11 @@ import {
   PermissionRequest,
   ToolCallEvent,
   UndoResultPayload,
+  ActiveFilePayload,
+  LspServer,
+  WorkspaceActivity,
+  WorkspacePickedPayload,
+  WorkspaceProjectRootPayload,
 } from '../types/chat';
 import { McpServerConfig, McpStatusUpdate } from '../types/mcp';
 import { PromptLibraryItem } from '../types/promptLibrary';
@@ -47,6 +52,11 @@ export interface AudioRecordingStateEvent { payload: AudioRecordingStatePayload;
 export interface AudioTranscriptionSettingsEvent { settings: AudioTranscriptionSettings; }
 export interface GlobalSettingsEvent { payload: GlobalSettingsPayload; }
 export interface AdapterDeletedEvent { adapterId: string; }
+export interface WorkspacePickedEvent { payload: WorkspacePickedPayload; }
+export interface WorkspaceProjectRootEvent { payload: WorkspaceProjectRootPayload; }
+export interface WorkspaceActivityEvent { payload: WorkspaceActivity[]; }
+export interface ActiveFileEvent { payload: ActiveFilePayload; }
+export interface LspServersEvent { servers: LspServer[]; }
 
 export const EVENT_NAMES = {
   ADAPTER_DELETED: 'acp-adapter-deleted',
@@ -79,6 +89,11 @@ export const EVENT_NAMES = {
   AUDIO_RECORDING_STATE: 'audio-recording-state',
   AUDIO_TRANSCRIPTION_SETTINGS: 'audio-transcription-settings',
   GLOBAL_SETTINGS: 'global-settings',
+  WORKSPACE_PICKED: 'workspace-picked',
+  WORKSPACE_PROJECT_ROOT: 'workspace-project-root',
+  WORKSPACE_ACTIVITY: 'workspace-activity',
+  ACTIVE_FILE: 'active-file',
+  LSP_SERVERS: 'lsp-servers',
 } as const;
 
 export function onBridgeEvent<T>(eventName: string, callback: (e: CustomEvent<T>) => void) {

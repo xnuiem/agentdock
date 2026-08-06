@@ -45,6 +45,11 @@ import {
   SystemInstructionsEvent,
   ToolCallBridgeEvent,
   UndoResultEvent,
+  ActiveFileEvent,
+  LspServersEvent,
+  WorkspaceActivityEvent,
+  WorkspacePickedEvent,
+  WorkspaceProjectRootEvent,
   onBridgeEvent,
 } from './bridgeEvents';
 
@@ -306,6 +311,26 @@ export const ACPBridge = {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.ADAPTER_DELETED, { detail: { adapterId } }));
     };
 
+    window.__onWorkspacePicked = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.WORKSPACE_PICKED, { detail: { payload } }));
+    };
+
+    window.__onWorkspaceProjectRoot = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.WORKSPACE_PROJECT_ROOT, { detail: { payload } }));
+    };
+
+    window.__onWorkspaceActivity = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.WORKSPACE_ACTIVITY, { detail: { payload } }));
+    };
+
+    window.__onActiveFile = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.ACTIVE_FILE, { detail: { payload } }));
+    };
+
+    window.__onLspServers = (servers) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.LSP_SERVERS, { detail: { servers } }));
+    };
+
     window.__onFilesResult = (filesJson) => {
       let files = [];
       try {
@@ -343,12 +368,12 @@ export const ACPBridge = {
     window.__requestAdapters?.();
   },
 
-  startAgent: (conversationId: string, adapterId?: string, modelId?: string, modeId?: string, reasoningEffortId?: string) => {
+  startAgent: (conversationId: string, adapterId?: string, modelId?: string, modeId?: string, reasoningEffortId?: string, rootPath?: string) => {
     if (typeof window.__startAgent !== 'function') {
       return Promise.reject(new Error('Start agent bridge is not available.'));
     }
     return awaitBridgeOperation('start_agent', (requestId) => {
-      window.__startAgent?.(conversationId, adapterId, modelId, modeId, requestId, reasoningEffortId);
+      window.__startAgent?.(conversationId, adapterId, modelId, modeId, requestId, reasoningEffortId, rootPath);
     });
   },
 
@@ -359,13 +384,14 @@ export const ACPBridge = {
     adapterId?: string,
     modelId?: string,
     modeId?: string,
-    reasoningEffortId?: string
+    reasoningEffortId?: string,
+    rootPath?: string
   ) => {
     if (typeof window.__sendPrompt !== 'function') {
       return Promise.reject(new Error('Send prompt bridge is not available.'));
     }
     return awaitBridgeOperation('send_prompt', (requestId) => {
-      window.__sendPrompt?.(conversationId, message, requestId, forkBase, adapterId, modelId, modeId, reasoningEffortId);
+      window.__sendPrompt?.(conversationId, message, requestId, forkBase, adapterId, modelId, modeId, reasoningEffortId, rootPath);
     });
   },
 
@@ -681,4 +707,34 @@ export const ACPBridge = {
   onGlobalSettings: (callback: (e: CustomEvent<GlobalSettingsEvent>) => void) => onBridgeEvent(EVENT_NAMES.GLOBAL_SETTINGS, callback),
 
   onAdapterDeleted: (callback: (e: CustomEvent<AdapterDeletedEvent>) => void) => onBridgeEvent(EVENT_NAMES.ADAPTER_DELETED, callback),
+
+  pickWorkspaceDirectory: () => {
+    window.__pickWorkspaceDirectory?.();
+  },
+
+  onWorkspacePicked: (callback: (e: CustomEvent<WorkspacePickedEvent>) => void) => onBridgeEvent(EVENT_NAMES.WORKSPACE_PICKED, callback),
+
+  requestWorkspaceProjectRoot: () => {
+    window.__requestWorkspaceProjectRoot?.();
+  },
+
+  onWorkspaceProjectRoot: (callback: (e: CustomEvent<WorkspaceProjectRootEvent>) => void) => onBridgeEvent(EVENT_NAMES.WORKSPACE_PROJECT_ROOT, callback),
+
+  requestWorkspaceActivity: (rootPaths: string[]) => {
+    window.__requestWorkspaceActivity?.(JSON.stringify(rootPaths));
+  },
+
+  onWorkspaceActivity: (callback: (e: CustomEvent<WorkspaceActivityEvent>) => void) => onBridgeEvent(EVENT_NAMES.WORKSPACE_ACTIVITY, callback),
+
+  requestActiveFile: () => {
+    window.__requestActiveFile?.();
+  },
+
+  onActiveFile: (callback: (e: CustomEvent<ActiveFileEvent>) => void) => onBridgeEvent(EVENT_NAMES.ACTIVE_FILE, callback),
+
+  requestLspServers: (rootPath: string) => {
+    window.__requestLspServers?.(rootPath);
+  },
+
+  onLspServers: (callback: (e: CustomEvent<LspServersEvent>) => void) => onBridgeEvent(EVENT_NAMES.LSP_SERVERS, callback),
 };

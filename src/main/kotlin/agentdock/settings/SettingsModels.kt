@@ -53,6 +53,16 @@ data class GitCommitGenerationSettings(
 )
 
 @Serializable
+data class Workspace(
+    val id: String,
+    // Host display form of the root dir (e.g. //wsl.localhost/<distro>/opt/mono or C:\...).
+    val rootPath: String,
+    // Display name; defaults to the directory leaf, renameable.
+    val name: String,
+    val addedAt: Long = 0
+)
+
+@Serializable
 data class GlobalSettings(
     val audioNotificationsEnabled: Boolean = true,
     val uiFontSizeOffsetPx: Int = 0,
@@ -61,7 +71,9 @@ data class GlobalSettings(
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
     val quotaWidgetEnabled: Boolean = false,
     val executionTarget: String = "local",
-    val wslDistro: String = ""
+    val wslDistro: String = "",
+    val workspaces: List<Workspace> = emptyList(),
+    val activeWorkspaceId: String = ""
 )
 
 @Serializable

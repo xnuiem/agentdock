@@ -3,6 +3,7 @@ import TabBar from './components/TabBar';
 import { AppTabContent } from './components/AppTabContent';
 import { EmptyStateView } from './components/EmptyStateView';
 import ConfirmationModal from './components/ConfirmationModal';
+import { WorkspaceRail } from './components/workspace/WorkspaceRail';
 import { useAppController } from './hooks/app/useAppController';
 import { ACPBridge } from './utils/bridge';
 
@@ -48,8 +49,17 @@ function App() {
 
   const {
     tabs,
+    visibleTabs,
     activeTabId,
     tabUi,
+    workspaces,
+    activeWorkspaceId,
+    workspaceAddError,
+    clearWorkspaceAddError,
+    handleSelectWorkspace,
+    handleRenameWorkspace,
+    handleRemoveWorkspace,
+    handleAddWorkspace,
     availableAgents,
     runnableAgents,
     agentAvailabilityResolved,
@@ -83,9 +93,22 @@ function App() {
   } = useAppController();
 
   return (
-    <div className="h-screen bg-background text-foreground overflow-hidden flex flex-col">
-      <TabBar
+    <div className="h-screen bg-background text-foreground overflow-hidden flex flex-row">
+      <WorkspaceRail
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
         tabs={tabs}
+        tabUi={tabUi}
+        addError={workspaceAddError}
+        onClearAddError={clearWorkspaceAddError}
+        onSelectWorkspace={handleSelectWorkspace}
+        onAddWorkspace={handleAddWorkspace}
+        onRenameWorkspace={handleRenameWorkspace}
+        onRemoveWorkspace={handleRemoveWorkspace}
+      />
+      <div className="flex-1 min-w-0 flex flex-col">
+      <TabBar
+        tabs={visibleTabs}
         activeTabId={activeTabId}
         tabUi={tabUi}
         onSelectTab={handleSelectTab}
@@ -107,6 +130,7 @@ function App() {
         onOpenManagement={() => openSingletonTab('management', 'Service Providers')}
         onOpenDesignSystem={() => openSingletonTab('design', 'Design System')}
         onOpenMcp={() => openSingletonTab('mcp', 'MCP Servers')}
+        onOpenLsp={() => openSingletonTab('lsp', 'LSPs')}
         onOpenPromptLibrary={() => openSingletonTab('prompt-library', 'Prompt Library')}
         onOpenSystemInstructions={() => openSingletonTab('system-instructions', 'System Instructions')}
         onOpenSettings={() => openSingletonTab('settings', 'Settings')}
@@ -116,14 +140,14 @@ function App() {
       <div className="flex-1 relative min-h-0">
         {/* All tabs -- keep mounted for state preservation, toggle visibility */}
         {tabs.map((tab) => {
-          const isTabActive = tab.id === activeTabId;
+          const isTabActive = tab.id === activeTabId && tab.workspaceId === activeWorkspaceId;
 
           return (
             <AppTabContent
               key={tab.id}
               tab={tab}
               isActive={isTabActive}
-              tabs={tabs}
+              tabs={visibleTabs}
               tabUi={tabUi}
               availableAgents={availableAgents}
               runnableAgents={runnableAgents}
@@ -149,7 +173,7 @@ function App() {
         })}
 
         {/* Empty state */}
-        {tabs.length === 0 && (
+        {visibleTabs.length === 0 && (
           <EmptyStateView
             availableAgents={availableAgents}
             runnableAgents={runnableAgents}
@@ -160,6 +184,7 @@ function App() {
             onOpenManagement={() => openSingletonTab('management', 'Service Providers')}
           />
         )}
+      </div>
       </div>
 
       <ConfirmationModal
